@@ -5,7 +5,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 let genAIInstance; // Store the genAI instance globally or re-initialize per call
 
 cmd({
-    pattern: "gemini", // හෝ ඔයාට කැමති pattern එකක්: "ai", "ask"
+    pattern: "ai", // හෝ ඔයාට කැමති pattern එකක්: "ai", "ask"
     react: "✨",
     desc: "Ask questions to Gemini AI.",
     category: "ai",
