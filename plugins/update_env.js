@@ -74,3 +74,5 @@ async (conn, mek, m, { from, q, reply, isOwner }) => {
     } catch (err) {
         console.error('Error updating environment variable:' + err.message);
         reply("🙇‍♂️ *Failed to update the environment variable. Please try again.*" + err);
+    }
+});
