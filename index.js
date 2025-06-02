@@ -39,6 +39,14 @@ const port = process.env.PORT || 8000;
 //=============================================
 
 async function connectToWA() {
+  //===================connect mongodb===================
+const connectDB = require('./lib/mongodb')
+connectDB();
+//==================================
+const {readEnv} = require('./lib/database')
+const config = await readEnv();
+const prefix = ('.')
+//=================================
 console.log("Connecting wa bot 🧬...");
 const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/')
 var { version } = await fetchLatestBaileysVersion()
@@ -132,6 +140,11 @@ conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
               }
             }
 
+//=================================WORKTYPE=========================================== 
+if(!isOwner && config.MODE === "private") return
+if(!isOwner && isGroup && config.MODE === "inbox") return
+if(!isOwner && isGroup && config.MODE === "groups") return
+//======================================================
 
 const events = require('./command')
 const cmdName = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : false;
