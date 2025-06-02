@@ -1,57 +1,79 @@
-const { readEnv } = require('../lib/database'); // ඔයාගේ readEnv function එකට path එක
-const { cmd } = require('../command'); // ඔයාගේ cmd function එකට path එක
+// commands/ai.js
+
+const { readEnv } = require('../lib/database'); // Correct path to your readEnv
+const { cmd } = require('../command');         // Correct path to your cmd
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-let genAIInstance; // Store the genAI instance globally or re-initialize per call
+let genAIInstance; // To store the initialized GenAI instance
 
 cmd({
-    pattern: "ai", // හෝ ඔයාට කැමති pattern එකක්: "ai", "ask"
+    pattern: "ai", // Command to trigger: .ai <your question>
     react: "✨",
     desc: "Ask questions to Gemini AI.",
-    category: "ai",
+    category: "ai", // You can create a new category or use an existing one
     filename: __filename
 },
-async (conn, mek, m, { from, q, reply }) => {
+async (conn, mek, m, { from, q, reply, isOwner }) => { // Added isOwner for potential owner-only error details
     try {
         if (!q) {
-            return reply("🤖 කරුණාකර මගෙන් ප්‍රශ්නයක් අහන්න.\nඋදා: `.gemini ලංකාවේ අගනුවර කුමක්ද?`");
+            return reply("🤖 කරුණාකර මගෙන් ප්‍රශ්නයක් අහන්න.\nඋදා: `.ai ලංකාවේ අගනුවර කුමක්ද?`");
         }
 
-        const config = await readEnv();
-        const GEMINI_API_KEY = config.GEMINI_API_KEY; // .env එකෙන් GEMINI_API_KEY එක ගන්න
+        const config = await readEnv(); // Load environment variables
+        const GEMINI_API_KEY = config.GEMINI_API_KEY; // Get API key from .env via readEnv
 
         if (!GEMINI_API_KEY) {
+            console.error("Gemini API Key is not configured in .env file.");
             return reply("🚫 Gemini API Key එක සකසා නැත. කරුණාකර bot හිමිකරු දැනුවත් කරන්න.");
         }
 
-        // Initialize genAI if not already done or if you prefer per-call initialization
+        // Initialize genAI if not already done
         if (!genAIInstance) {
             genAIInstance = new GoogleGenerativeAI(GEMINI_API_KEY);
         }
-        // For text-only input, use the gemini-pro model
+        
         const model = genAIInstance.getGenerativeModel({ model: "gemini-pro" });
 
-        await reply("🤔 මම හිතන ගමන් ඉන්නේ... කරුණාකර රැඳී සිටින්න."); // Loading message
+        // Send a thinking message
+        const thinkingMessage = await conn.sendMessage(from, { text: "🤔 AI එක හිතන ගමන් ඉන්නේ... කරුණාකර මදක් රැඳී සිටින්න." }, { quoted: mek });
 
-        const result = await model.generateContent(q); // q කියන්නේ user ගහපු ප්‍රශ්නය
+        const result = await model.generateContent(q); // 'q' is the user's question
         const response = await result.response;
         const text = response.text();
 
-        return await reply(text);
+        // Edit the thinking message with the actual response
+        // Or send a new reply, editing might be cleaner if supported well by your conn.sendMessage
+        return await conn.sendMessage(from, { text: text }, { quoted: mek });
+        // If you want to edit the "thinking" message:
+        // return await conn.relayMessage(from, {
+        //     protocolMessage: {
+        //         key: thinkingMessage.key,
+        //         type: 14, // EPHEMERAL_SETTING
+        //         editedMessage: {
+        //             conversation: text
+        //         }
+        //     },
+        //     messageTimestamp: thinkingMessage.messageTimestamp
+        // }, { quoted: mek });
+        // Note: Editing messages can be complex; sending a new reply is simpler.
 
     } catch (e) {
         console.error("Gemini AI Error:", e);
-        let errorMessage = "😥 සමාවන්න, යම් දෝෂයක් සිදු විය.";
+        let errorMessage = "😥 සමාවන්න, Gemini AI වෙත සම්බන්ධ වීමේදී දෝෂයක් සිදු විය.";
         if (e.message) {
-            // Check for specific Gemini API errors if needed
-            if (e.message.includes('API key not valid')) {
-                errorMessage = "🚫 API Key එක වැරදියි. කරුණාකර bot හිමිකරු දැනුවත් කරන්න.";
+            if (e.message.includes('API key not valid') || e.message.includes('permissionDenied')) {
+                errorMessage = "🚫 API Key එක වැරදියි හෝ අවසර නැත. කරුණාකර bot හිමිකරු දැනුවත් කරන්න.";
             } else if (e.message.includes('quota') || e.message.includes('rate limit')) {
                 errorMessage = "⌛ API සීමාව ඉක්මවා ඇත. කරුණාකර පසුව උත්සාහ කරන්න.";
+            } else if (e.response && e.response.candidates && e.response.candidates[0].finishReason === 'SAFETY') {
+                errorMessage = "❌ ඔබගේ ඉල්ලීම ආරක්ෂක ප්‍රතිපත්ති හේතුවෙන් ප්‍රතික්ෂේප විය."
             }
         }
-        // For debugging, you might want to send the actual error to the owner
-        // if (isOwner) reply(`Error for owner: ${e.toString()}`);
+        
+        // If you want to send detailed error to owner only
+        if (isOwner) {
+            await reply(`Owner Debug: ${e.toString()}`);
+        }
         return reply(errorMessage);
     }
 });
