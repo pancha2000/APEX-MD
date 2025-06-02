@@ -1,61 +1,44 @@
 // commands/ai.js
 
-const { readEnv } = require('../lib/database'); // Correct path to your readEnv
-const { cmd } = require('../command');         // Correct path to your cmd
+// const { readEnv } = require('../lib/database'); // මේ ලයින් එක අයින් කරන්න හෝ comment කරන්න
+const { cmd } = require('../command');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-let genAIInstance; // To store the initialized GenAI instance
+let genAIInstance;
 
 cmd({
-    pattern: "ai", // Command to trigger: .ai <your question>
+    pattern: "ai",
     react: "✨",
     desc: "Ask questions to Gemini AI.",
-    category: "ai", // You can create a new category or use an existing one
+    category: "ai",
     filename: __filename
 },
-async (conn, mek, m, { from, q, reply, isOwner }) => { // Added isOwner for potential owner-only error details
+async (conn, mek, m, { from, q, reply, isOwner }) => {
     try {
         if (!q) {
             return reply("🤖 කරුණාකර මගෙන් ප්‍රශ්නයක් අහන්න.\nඋදා: `.ai ලංකාවේ අගනුවර කුමක්ද?`");
         }
 
-        const config = await readEnv(); // Load environment variables
-        const GEMINI_API_KEY = config.GEMINI_API_KEY; // Get API key from .env via readEnv
+        // config.js එකෙන් GEMINI_API_KEY එක කෙලින්ම ගන්න
+        const GEMINI_API_KEY = global.GEMINI_API_KEY;
 
-        if (!GEMINI_API_KEY) {
-            console.error("Gemini API Key is not configured in .env file.");
-            return reply("🚫 Gemini API Key එක සකසා නැත. කරුණාකර bot හිමිකරු දැනුවත් කරන්න.");
+        if (!GEMINI_API_KEY || GEMINI_API_KEY === "YOUR_GEMINI_API_KEY" || GEMINI_API_KEY === "YOUR_API_KEY_FROM_CONFIG_JS") { // config.js එකේ default value එකත් චෙක් කරන්න
+            console.error("Gemini API Key is not configured correctly in config.js or as a global variable.");
+            // ඔයා config.js එකේ API key එක දාන තැන default value එකක් පාවිච්චි කරනවනම්, ඒකත් මෙතනට දාන්න
+            // උදා: GEMINI_API_KEY === "YOUR_GEMINI_API_KEY" (ඔයාගෙ config.js එකේ default එක අනුව)
+            return reply("🚫 Gemini API Key එක config.js ෆයිල් එකේ සකසා නැත. කරුණාකර bot හිමිකරු දැනුවත් කරන්න.");
         }
 
-        // Initialize genAI if not already done
         if (!genAIInstance) {
             genAIInstance = new GoogleGenerativeAI(GEMINI_API_KEY);
         }
         
         const model = genAIInstance.getGenerativeModel({ model: "gemini-pro" });
-
-        // Send a thinking message
         const thinkingMessage = await conn.sendMessage(from, { text: "🤔 AI එක හිතන ගමන් ඉන්නේ... කරුණාකර මදක් රැඳී සිටින්න." }, { quoted: mek });
-
-        const result = await model.generateContent(q); // 'q' is the user's question
+        const result = await model.generateContent(q);
         const response = await result.response;
         const text = response.text();
-
-        // Edit the thinking message with the actual response
-        // Or send a new reply, editing might be cleaner if supported well by your conn.sendMessage
         return await conn.sendMessage(from, { text: text }, { quoted: mek });
-        // If you want to edit the "thinking" message:
-        // return await conn.relayMessage(from, {
-        //     protocolMessage: {
-        //         key: thinkingMessage.key,
-        //         type: 14, // EPHEMERAL_SETTING
-        //         editedMessage: {
-        //             conversation: text
-        //         }
-        //     },
-        //     messageTimestamp: thinkingMessage.messageTimestamp
-        // }, { quoted: mek });
-        // Note: Editing messages can be complex; sending a new reply is simpler.
 
     } catch (e) {
         console.error("Gemini AI Error:", e);
@@ -69,8 +52,6 @@ async (conn, mek, m, { from, q, reply, isOwner }) => { // Added isOwner for pote
                 errorMessage = "❌ ඔබගේ ඉල්ලීම ආරක්ෂක ප්‍රතිපත්ති හේතුවෙන් ප්‍රතික්ෂේප විය."
             }
         }
-        
-        // If you want to send detailed error to owner only
         if (isOwner) {
             await reply(`Owner Debug: ${e.toString()}`);
         }
