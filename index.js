@@ -17,7 +17,7 @@ const util = require('util')
 const { sms,downloadMediaMessage } = require('./lib/msg')
 const axios = require('axios')
 const { File } = require('megajs')
-const prefix = '.'
+
 
 const ownerNumber = ['94701391585']
 
@@ -45,7 +45,7 @@ connectDB();
 //==================================
 const {readEnv} = require('./lib/database')
 const config = await readEnv();
-const prefix = ('.')
+const prefix = config.PREFIX
 //=================================
 console.log("Connecting wa bot 🧬...");
 const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/')
