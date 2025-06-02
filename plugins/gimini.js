@@ -44,7 +44,7 @@ async (conn, mek, m, { from, q, reply, isOwner }) => {
             }
         }
         
-        const model = genAIInstance.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+        const model = genAIInstance.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
         // "Thinking" message එකක් යවන්න
         await reply("🤔 AI එක හිතන ගමන් ඉන්නේ... කරුණාකර මදක් රැඳී සිටින්න.");
