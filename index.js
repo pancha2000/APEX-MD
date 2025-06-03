@@ -141,11 +141,30 @@ conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
               }
             }
 
-//=================================WORKTYPE=========================================== 
+//=================================WORKTYPE===========================================
+const { readEnv } = require('./lib/database');
 
-if(!isOwner && config.MODE === "private") return
-if(!isOwner && isGroup && config.MODE === "inbox") return
-if(!isOwner && isGroup && config.MODE === "groups") return
+// මේ function එක async නිසා await use කරන්න පුළුවන්
+(async () => {
+  const config = await readEnv();
+
+  // Ownerද නැත්තං condition check කරන්න
+  if (!isOwner) {
+    // Private mode එකේ නම් owner විතරයි run කරන්න පුළුවන්
+    if (config.MODE === "private") return;
+
+    // Inbox mode එකේ නම් group වල reply කරන්න ඕන නෑ
+    if (isGroup && config.MODE === "inbox") return;
+
+    // Groups mode එකේ නම් inbox වල reply කරන්න ඕන නෑ
+    if (!isGroup && config.MODE === "groups") return;
+  }
+
+  // මෙතනින් පස්සේ normal code එක run වේ
+  console.log("Command accepted!");
+
+})();
+
 //======================================================
 
 const events = require('./command')
