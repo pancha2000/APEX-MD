@@ -68,7 +68,7 @@ const conn = makeWASocket({
         version
         })
     
-conn.ev.on('connection.update', (update) => {
+conn.ev.on('connection.update', async (update) => {
 const { connection, lastDisconnect } = update
 if (connection === 'close') {
 if (lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut) {
