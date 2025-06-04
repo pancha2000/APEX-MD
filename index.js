@@ -7,7 +7,7 @@ getContentType,
 fetchLatestBaileysVersion,
 Browsers
 } = require('@whiskeysockets/baileys')
-
+const { readEnv, updateEnv } = require('./lib/database');
 const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson } = require('./lib/functions')
 const fs = require('fs')
 const P = require('pino')
@@ -44,7 +44,6 @@ async function connectToWA() {
 const connectDB = require('./lib/mongodb')
 connectDB();
 //==================================
-const {readEnv} = require('./lib/database')
 
 let initialConfigForStartup;
 try {
@@ -200,31 +199,6 @@ conn.sendFileUrl = async (jid, url, caption, quoted, options = {}) => {
               }
             }
 
-//=================================WORKTYPE===========================================
-const { readEnv } = require('./lib/database');
-
-// මේ function එක async නිසා await use කරන්න පුළුවන්
-(async () => {
-  const config = await readEnv();
-
-  // Ownerද නැත්තං condition check කරන්න
-  if (!isOwner) {
-    // Private mode එකේ නම් owner විතරයි run කරන්න පුළුවන්
-    if (config.MODE === "private") return;
-
-    // Inbox mode එකේ නම් group වල reply කරන්න ඕන නෑ
-    if (isGroup && config.MODE === "inbox") return;
-
-    // Groups mode එකේ නම් inbox වල reply කරන්න ඕන නෑ
-    if (!isGroup && config.MODE === "groups") return;
-  }
-
-  // මෙතනින් පස්සේ normal code එක run වේ
-  console.log("Command accepted!");
-
-})();
-
-//======================================================
 
 const events = require('./command')
 const cmdName = isCmd ? body.slice(1).trim().split(" ")[0].toLowerCase() : false;
