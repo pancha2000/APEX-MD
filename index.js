@@ -151,6 +151,10 @@ async function connectToWA() {
             console.log("DEBUG: Received an invalid or empty message structure in upsert.");
             return;
         }
+        
+        if (mek.key.remoteJid && mek.key.remoteJid.endsWith('@g.us')) { 
+        console.log("DEBUG: Full mek object for group message:", JSON.stringify(mek, null, 2)); 
+        
         console.log(`DEBUG: Raw message received in upsert. From: ${mek.key.remoteJid}, Type: ${getContentType(mek.message)}, ID: ${mek.key.id}`);
         // ===================================================================
 
