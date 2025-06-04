@@ -100,7 +100,7 @@ let up = `Wa-BOT connected successful ✅\n\nPREFIX: ${startupPrefix}\nMODE: ${s
 // ownerNumber යනු array එකක් නිසා ownerNumber[0] භාවිතා කරන්න.
 conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { image: { url: `https://telegra.ph/file/900435c6d3157c98c3c88.jpg` }, caption: up });
 
-conn.sendMessage(ownerNumber + "@s.whatsapp.net", { image: { url: `https://telegra.ph/file/900435c6d3157c98c3c88.jpg` }, caption: up })
+
 //===========================================
 }
 })
