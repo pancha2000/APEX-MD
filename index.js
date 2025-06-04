@@ -45,8 +45,15 @@ const connectDB = require('./lib/mongodb')
 connectDB();
 //==================================
 const {readEnv} = require('./lib/database')
-const config = await readEnv()
-  const prefix = config.PREFIX || ".";
+
+let initialConfigForStartup;
+try {
+    initialConfigForStartup = await readEnv();
+} catch (e) {
+    console.error("Error reading initial config for startup:", e);
+    initialConfigForStartup = { PREFIX: './config.js or .', MODE: 'public (DB error)' };
+}
+const initialPrefix = initialConfigForStartup.PREFIX || ".";
 //=================================
 console.log("Connecting wa bot 🧬...");
 const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/')
@@ -78,15 +85,44 @@ require("./plugins/" + plugin);
 console.log('Plugins installed successful ✅')
 console.log('Bot connected to whatsapp ✅')
 
-let up = `Wa-BOT connected successful ✅\n\nPREFIX: ${prefix}`;
+// ====================Bot start mas==================
+let currentDbConfigForStartup;
+try {
+    currentDbConfigForStartup = await readEnv();
+} catch (e) {
+    console.error("Error reading DB config for startup message:", e);
+    // initialPrefix එක උඩ define කරපු එකෙන් ගන්න, නැත්නම් default එකක් දෙන්න
+    currentDbConfigForStartup = { PREFIX: initialPrefix || ".", MODE: 'public (DB read error)' };
+}
+const startupPrefix = currentDbConfigForStartup.PREFIX || ".";
+const startupMode = currentDbConfigForStartup.MODE || "public";
+
+let up = `Wa-BOT connected successful ✅\n\nPREFIX: ${startupPrefix}\nMODE: ${startupMode}`;
+// ownerNumber යනු array එකක් නිසා ownerNumber[0] භාවිතා කරන්න.
+conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { image: { url: `https://telegra.ph/file/900435c6d3157c98c3c88.jpg` }, caption: up });
 
 conn.sendMessage(ownerNumber + "@s.whatsapp.net", { image: { url: `https://telegra.ph/file/900435c6d3157c98c3c88.jpg` }, caption: up })
-
+//===========================================
 }
 })
 conn.ev.on('creds.update', saveCreds)  
 
 conn.ev.on('messages.upsert', async(mek) => {
+  // conn.ev.on('messages.upsert', async(mek) => {  <-- මේ පේළියට පස්සේ, ඊළඟ පේළියට කලින්
+    // ============ REAL-TIME CONFIG & MODE SETUP ================
+    let dbConfig;
+    try {
+        dbConfig = await readEnv(); // හැම message එකටම අලුත් config එක DB එකෙන් ගන්නවා
+    } catch (error) {
+        console.error("messages.upsert: Failed to read env from DB, using defaults:", error);
+        dbConfig = { // Fallback to defaults if DB read fails
+            PREFIX: process.env.PREFIX || ".",
+            MODE: process.env.MODE || "public",
+        };
+    }
+    const prefix = dbConfig.PREFIX || "."; // DB එකෙන් ආපු අලුත්ම prefix එක
+    const currentMode = (dbConfig.MODE || 'public').toLowerCase(); // DB එකෙන් ආපු අලුත්ම mode එක
+    // ============================================================
 mek = mek.messages[0]
 if (!mek.message) return	
 mek.message = (getContentType(mek.message) === 'ephemeralMessage') ? mek.message.ephemeralMessage.message : mek.message
@@ -108,6 +144,29 @@ const botNumber = conn.user.id.split(':')[0]
 const pushname = mek.pushName || 'Sin Nombre'
 const isMe = botNumber.includes(senderNumber)
 const isOwner = ownerNumber.includes(senderNumber) || isMe
+
+    // =================== MODE LOGIC (WORKTYPE) ===================
+    if (!isOwner) {
+        let blockUser = false;
+        switch (currentMode) {
+            case 'private':
+                blockUser = true;
+                break;
+            case 'inbox':
+                if (isGroup) blockUser = true;
+                break;
+            case 'groups':
+                if (!isGroup) blockUser = true;
+                break;
+            // 'public' mode: blockUser remains false
+        }
+        if (blockUser) {
+            // console.log(`[MODE: ${currentMode}] User ${sender} from ${from} blocked.`);
+            return; 
+        }
+    }
+    // ==============================================================
+
 const botNumber2 = await jidNormalizedUser(conn.user.id);
 const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(e => {}) : ''
 const groupName = isGroup ? groupMetadata.subject : ''
