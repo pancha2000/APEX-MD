@@ -120,7 +120,14 @@ conn.ev.on('messages.upsert', async(mek) => {
         };
     }
     const prefix = dbConfig.PREFIX || "."; // DB එකෙන් ආපු අලුත්ම prefix එක
-    const currentMode = (dbConfig.MODE || 'public').toLowerCase(); // DB එකෙන් ආපු අලුත්ම mode එක
+    const currentMode = (dbConfig.MODE || 'public').toLowerCase(); // DB එකෙන් ආපු අලුත්ම mode එකp
+    
+// conn.ev.on('messages.upsert', async(mek) => {
+    // ... (ඔබේ REAL-TIME CONFIG & MODE SETUP කොටසට පස්සේ)
+    const prefix = dbConfig.PREFIX || "."; 
+    const currentMode = (dbConfig.MODE || 'public').toLowerCase(); 
+    console.log(`DEBUG: Bot is thinking MODE is: ${currentMode}`); // <<--- මේ පේළිය අලුතින් දාන්න
+// ... (ඉතුරු කේතය)
     // ============================================================
 mek = mek.messages[0]
 if (!mek.message) return	
@@ -136,13 +143,20 @@ const isCmd = body.startsWith(prefix)
 const command = isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : ''
 const args = body.trim().split(/ +/).slice(1)
 const q = args.join(' ')
-const isGroup = from.endsWith('@g.us')
+// ...
+const isGroup = from.endsWith('@g.us');
+console.log(`DEBUG: Is this a group message? ${isGroup}. From JID: ${from}`); // <<--- මේ පේළිය අලුතින් දාන්න
+// ...
 const sender = mek.key.fromMe ? (conn.user.id.split(':')[0]+'@s.whatsapp.net' || conn.user.id) : (mek.key.participant || mek.key.remoteJid)
 const senderNumber = sender.split('@')[0]
 const botNumber = conn.user.id.split(':')[0]
 const pushname = mek.pushName || 'Sin Nombre'
 const isMe = botNumber.includes(senderNumber)
 const isOwner = ownerNumber.includes(senderNumber) || isMe
+
+// ... isOwner, isGroup වගේ ඒවා define කළාට පස්සේ
+console.log(`DEBUG: Before mode check - Mode: ${currentMode}, isGroup: ${isGroup}, isOwner: ${isOwner}`); // <<--- මේ පේළිය අලුතින් දාන්න
+
 
     // =================== MODE LOGIC (WORKTYPE) ===================
     if (!isOwner) {
@@ -158,11 +172,13 @@ const isOwner = ownerNumber.includes(senderNumber) || isMe
                 if (!isGroup) blockUser = true;
                 break;
             // 'public' mode: blockUser remains false
-        }
-        if (blockUser) {
-            // console.log(`[MODE: ${currentMode}] User ${sender} from ${from} blocked.`);
-            return; 
-        }
+        }// ...
+if (blockUser) {
+    console.log(`DEBUG: User is being blocked! Mode: ${currentMode}, isGroup: ${isGroup}`); // <<--- මේ පේළිය අලුතින් දාන්න
+    return;
+}
+// ...
+        
     }
     // ==============================================================
 
