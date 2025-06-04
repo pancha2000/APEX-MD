@@ -151,6 +151,14 @@ async function connectToWA() {
         // ===================== DEBUG LOG 1: RAW MESSAGE (already exists, keep it) =====================
         console.log(`DEBUG: Raw message received in upsert. From: ${mek.key.remoteJid}, Type: ${getContentType(mek.message)}, ID: ${mek.key.id}`);
         // ============================================================================================
+// ===================== HANDLE/IGNORE STUB MESSAGES =====================
+    // messageStubType එකක් තියෙනවා නම්, ඒක log කරලා return වෙන්න
+    if (mek.messageStubType) {
+        console.log(`DEBUG: Ignoring stub message. Type: ${mek.messageStubType}, Parameters: ${mek.messageStubParameters?.join(', ')}`);
+        return; // Stub message ignore කරනවා
+    }
+    // =======================================================================
+
 
         // ============ REAL-TIME CONFIG & MODE SETUP ================
         let dbConfig;
