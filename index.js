@@ -124,8 +124,7 @@ conn.ev.on('messages.upsert', async(mek) => {
     
 // conn.ev.on('messages.upsert', async(mek) => {
     // ... (ඔබේ REAL-TIME CONFIG & MODE SETUP කොටසට පස්සේ)
-    const prefix = dbConfig.PREFIX || "."; 
-    const currentMode = (dbConfig.MODE || 'public').toLowerCase(); 
+    
     console.log(`DEBUG: Bot is thinking MODE is: ${currentMode}`); // <<--- මේ පේළිය අලුතින් දාන්න
 // ... (ඉතුරු කේතය)
     // ============================================================
