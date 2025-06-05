@@ -4,6 +4,9 @@ const { cmd, commands } = require('../command'); // Import 'commands' array
 
 cmd({
     pattern: "menu",
+    category: "main",
+    react: "📜",
+    filename: __filename
     // ...
 },
 async (conn, mek, m, { pushname, from, reply }) => {
