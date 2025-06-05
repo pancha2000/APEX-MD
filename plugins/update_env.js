@@ -1,14 +1,20 @@
-// plugins/update_env.js
-const { updateEnv, readEnv } = require('../lib/database');
-const EnvVar = require('../lib/mongodbenv'); // Assuming this model is for checking existence
+// plugins/settings.js (මෙය ඔබගේ කලින් update_env.js හි සංශෝධිත කොටස සහ .get විධානයද අඩංගු වේ)
+const { updateEnv, readEnv, getBotSettings } = require('../lib/mongodb');
+const EnvVar = require('../lib/mongodbenv');
 const { cmd } = require('../command');
 
 cmd({
     pattern: "update",
-    // ... (rest of your command definition)
+    alias: ["set"],
+    desc: "Update a bot setting in the database (e.g., .update ALIVE_MSG:hello). All settings.",
+    usage: ".update <KEY>:<VALUE>",
+    fromMe: true,
+    react: "🔄",
+    category: "owner",
+    filename: __filename
 },
-async (conn, mek, m, { from, q, reply, isOwner }) => {
-    if (!isOwner) return reply("This command is for the bot owner only.");
+async (conn, mek, m, { q, reply, isOwner }) => {
+    if (!isOwner) return reply("මෙම විධානය භාවිතා කළ හැක්කේ බොට් හිමිකරුට පමණි.");
 
     if (!q) {
         return reply("🙇‍♂️ *Please provide the environment variable and its new value.* \n\nExample: `.update ALIVE_MSG:hello ` or `.update MODE:public`");
@@ -19,52 +25,76 @@ async (conn, mek, m, { from, q, reply, isOwner }) => {
         return reply("🫠 *Invalid format. Please use the format:* `.update KEY:VALUE`");
     }
 
-    const keyToUpdate = q.substring(0, delimiterIndex).trim().toUpperCase(); // Standardize key to uppercase
+    const keyToUpdate = q.substring(0, delimiterIndex).trim().toUpperCase();
     const valueToUpdate = q.substring(delimiterIndex + 1).trim();
 
-    if (!keyToUpdate || valueToUpdate === '') { // Check if value is empty string after trim
-        return reply("🫠 *Invalid format. Key or Value cannot be empty. Use:* `.update KEY:VALUE`");
+    if (!keyToUpdate) {
+        return reply("🫠 *Invalid format. Key cannot be empty. Use:* `.update KEY:VALUE`");
     }
 
     const validModes = ['public', 'private', 'groups', 'inbox'];
 
-    // Specific validations
     if (keyToUpdate === 'MODE' && !validModes.includes(valueToUpdate.toLowerCase())) {
         return reply(`😒 *Invalid mode. Valid modes are: ${validModes.join(', ')}*`);
     }
-    if (keyToUpdate === 'ALIVE_IMG' && !valueToUpdate.startsWith('https://')) {
-        return reply("😓 *Invalid URL format for ALIVE_IMG. Please provide a valid image URL.*");
+    if (keyToUpdate === 'ALIVE_IMG') {
+        try {
+            new URL(valueToUpdate);
+            if (!valueToUpdate.startsWith('http://') && !valueToUpdate.startsWith('https://')) {
+                return reply("😓 *Invalid URL format for ALIVE_IMG. Please provide a valid HTTP/HTTPS URL.*");
+            }
+        } catch (e) {
+            return reply("😓 *Invalid URL format for ALIVE_IMG. Please provide a valid URL.*");
+        }
     }
+    
     if (keyToUpdate === 'PREFIX' && (valueToUpdate.length > 1 || /\s/.test(valueToUpdate))) {
         return reply("😓 *Invalid PREFIX. It should be a single character without spaces.*");
     }
-    // Add more validations for other specific keys if needed
 
     try {
-        // Check if the environment variable exists (optional, as updateEnv can upsert)
-        const envVar = await EnvVar.findOne({ key: keyToUpdate });
-        if (!envVar) {
-            // Optional: List existing vars if key doesn't exist
-            // const allEnvVars = await readEnv();
-            // const envList = Object.entries(allEnvVars).map(([k, v]) => `${k}: ${v}`).join('\n');
-            // return reply(`❌ *The environment variable ${keyToUpdate} does not exist in the current DB setup.*\n\n*Consider adding it or check spelling.\nExisting variables:\n${envList}`);
-            console.log(`Env var ${keyToUpdate} does not exist, will be created by updateEnv.`);
-        }
+        const updatedDoc = await updateEnv(keyToUpdate, valueToUpdate);
 
-        // Update the environment variable using the function from database.js
-        const success = await updateEnv(keyToUpdate, valueToUpdate); // updateEnv now handles upsert
-
-        if (success) {
+        if (updatedDoc) {
             reply(`✅ *Environment variable updated.*\n\n🗃️ *${keyToUpdate}* ➠ ${valueToUpdate}`);
-            // Note: The bot might need a restart for some env changes (like PREFIX or MODE) to take full effect globally,
-            // unless you re-read and apply them immediately after update.
-            // For PREFIX and MODE, you might want to update the global `botSettings` and `prefix` variables in index.js.
+            await readEnv(); // Update internal cache
         } else {
             reply(`🙇‍♂️ *Failed to update the environment variable ${keyToUpdate}. Please check logs.*`);
         }
         
     } catch (err) {
-        console.error('Error in update command:', err); // Log the actual error
-        reply("🙇‍♂️ *An unexpected error occurred. Please try again.*");
+        console.error('Error in update command:', err);
+        reply(`🙇‍♂️ *An unexpected error occurred: ${err.message}. Please try again.*`);
+    }
+});
+
+// .get (View Settings) Command
+cmd({
+    pattern: "get",
+    alias: ["view"],
+    desc: "View current bot settings (e.g., .get MODE)",
+    usage: ".get <KEY>",
+    fromMe: true,
+    react: "🔍",
+    category: "owner",
+    filename: __filename
+}, async (conn, mek, m, { args, reply, isOwner }) => {
+    if (!isOwner) return reply("මෙම විධානය භාවිතා කළ හැක්කේ බොට් හිමිකරුට පමණි.");
+
+    const key = args[0] ? args[0].trim().toUpperCase() : '';
+    if (!key) {
+        // සියලුම existing keys පෙන්වීමට
+        const allSettings = getBotSettings();
+        const keys = Object.keys(allSettings).sort().join(', ');
+        return reply(`ඔබට බැලීමට අවශ්‍ය Setting එකේ KEY එක ලබා දෙන්න. උදා: .get MODE\n\nපවතින Keys: ${keys}`);
+    }
+
+    const botSettings = getBotSettings();
+    const value = botSettings[key];
+
+    if (value === undefined) {
+        reply(`Setting: *${key}* හමු නොවීය.`);
+    } else {
+        reply(`Setting: *${key}* = *${value}*`);
     }
 });
