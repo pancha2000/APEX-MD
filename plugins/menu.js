@@ -12,7 +12,7 @@ cmd({
 async (conn, mek, m, { pushname, from, reply }) => {
     try {
         const dbConfig = await readEnv();
-        let menuText = `╭━━━━∙⋆⋅⋆∙━ ─┉─ • ─┉─⊷\n  Hello *${pushname}*\n  Welcome To Pancha-One-Bot Menu\n╰━━━━∙⋆⋅⋆∙━ ─┉─ • ─┉─⊷\n\n`;
+        let menuText = `╭━━━━∙⋆⋅⋆∙━ ─┉─ • ─┉─⊷\n  Hello *${pushname}*\n  Welcome To APEX-MD Main Menu\n╰━━━━∙⋆⋅⋆∙━ ─┉─ • ─┉─⊷\n\n`;
 
         const categories = {};
         commands.forEach(command => {
@@ -32,7 +32,7 @@ async (conn, mek, m, { pushname, from, reply }) => {
             menuText += `*┕───────────────────❒*\n\n`;
         }
         
-        menuText += `> *POWERED BY SHEHAN VIMUKTHI*\n╘✦•·········••••😈•••············•✦`;
+        menuText += `> *POWERED BY APEX-MD*\n╘✦•·········••••📜•••············•✦`;
 
         const aliveImgUrl = dbConfig.ALIVE_IMG;
         if (aliveImgUrl) {
