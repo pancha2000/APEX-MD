@@ -8,6 +8,9 @@ const GEMINI_API_KEY = config.GEMINI_API_KEY; // Get from config
 
 cmd({
     pattern: "ai",
+    category: "ai",
+    react: "🧠",
+    filename: __filename
     // ... (rest of the command definition)
 },
 async (conn, mek, m, { q, reply, isOwner }) => {
