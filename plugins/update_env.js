@@ -7,7 +7,7 @@ cmd({
     pattern: "update",
     alias: ["set"],
     desc: "Update a bot setting in the database (e.g., .update ALIVE_MSG:hello). All settings.",
-    usage: ".update <KEY>:<VALUE>",
+    usage: ".update <KEY> <VALUE>",
     fromMe: true,
     react: "🔄",
     category: "owner",
