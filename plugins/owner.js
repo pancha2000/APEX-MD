@@ -31,7 +31,7 @@ let madeMenu = `❁ ════ ❃•◯•❃ ════ ❁
 ┝ I am not an expert in coding. As far as I know, this bot is built according to my knowledge. I am actually a hydraulic machine technician😅.
 ❁ ════ ❃•⇆•❃ ════ ❁
 
-> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ Shehan Vimukthi*
+> *ᴘᴏᴡᴇʀᴇᴅ ʙʏ APEX-MD*
 
 ╰━❁ ═══ ❃•⇆•❃ ═══ ❁━╯
 `
