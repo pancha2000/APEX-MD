@@ -33,7 +33,6 @@ let botSettings = {
 };
 let prefix = botSettings.PREFIX;
 
-
 async function connectToWA() {
     // connectDB is called before connectToWA in startBot()
     // Read environment settings from DB
@@ -47,7 +46,7 @@ async function connectToWA() {
         console.warn("Could not load settings from DB. Using default/hardcoded settings.", error.message);
         // prefix remains the default one initialized globally
     }
-    
+
     console.log("Connecting wa bot 🧬...");
     const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/');
     var { version } = await fetchLatestBaileysVersion();
@@ -69,7 +68,7 @@ async function connectToWA() {
         }
         if (connection === 'close') {
             const statusCode = lastDisconnect.error?.output?.statusCode;
-            const shouldReconnect = (statusCode !== DisconnectReason.loggedOut && 
+            const shouldReconnect = (statusCode !== DisconnectReason.loggedOut &&
                                      statusCode !== DisconnectReason.connectionClosed && // if we closed it intentionally
                                      statusCode !== DisconnectReason.connectionLost && // if internet issue, baileys handles it
                                      statusCode !== DisconnectReason.timedOut); // baileys handles it
@@ -121,7 +120,12 @@ async function connectToWA() {
         // Ephemeral and viewOnce messages are handled inside sms function
 
         const m = sms(conn, mek);
-        if (!m || !m.type) return; // If sms processing fails or no type
+        if (!m || !m.type) {
+            // 'm' හෝ 'm.type' වල ගැටලුවක් ඇත්නම් ලොග් කිරීම හොඳයි
+            console.warn("අවවාදය: sms(conn, mek) මගින් වලංගු නොවන 'm' වස්තුවක් හෝ 'm.type' එකක් ලැබී ඇත. පණිවිඩය මඟ හරිනු ලැබේ.");
+            // console.warn("Mek විස්තර:", JSON.stringify(mek, null, 2).substring(0, 500)); // සන්දර්භය සඳහා mek හි කොටසක් ලොග් කරන්න
+            return;
+        }
 
         const body = m.body || ''; // Use m.body directly from sms function
         
@@ -134,6 +138,20 @@ async function connectToWA() {
         const quoted = m.quoted; // Use from sms
         const isGroup = m.isGroup; // Use from sms
         const sender = m.sender; // Use from sms
+
+        // --- දෝෂය ඇතිවන ස්ථාන සඳහා නව පරීක්ෂා කිරීම් ආරම්භය ---
+        if (!sender) {
+            console.error(`[ERROR] m.sender හිස් හෝ අර්ථ දක්වා නැත. Chat: ${m.chat || 'N/A'}, Type: ${m.type || 'N/A'}. පණිවිඩය මඟ හරිනු ලැබේ.`);
+            // වැඩිදුර දෝෂ නිවැරදි කිරීම් සඳහා, 'mek' හෝ 'm' වස්තුව ලොග් කළ හැක, නමුත් ප්‍රවේශම් වන්න.
+            return; // ක්‍රෑෂ් වීම වැළැක්වීමට මෙම පණිවිඩය සැකසීම මඟ හරින්න
+        }
+
+        if (!conn.user || !conn.user.id) {
+            console.error("[ERROR] conn.user.id හිස් හෝ අර්ථ දක්වා නැත. බොට් එක සම්පූර්ණයෙන් ලොග් වී නොතිබෙන්නට පුළුවන. පණිවිඩය මඟ හරිනු ලැබේ.");
+            return; // මෙම පණිවිඩය සැකසීම මඟ හරින්න
+        }
+        // --- දෝෂය ඇතිවන ස්ථාන සඳහා නව පරීක්ෂා කිරීම් අවසානය ---
+
         const senderNumber = sender.split('@')[0];
         const botNumber = conn.user.id.split(':')[0];
         const pushname = mek.pushName || 'Sin Nombre'; // mek.pushName is fine
@@ -141,7 +159,7 @@ async function connectToWA() {
         const isOwner = ownerNumber.includes(senderNumber) || isMe;
         const botNumber2 = await jidNormalizedUser(conn.user.id);
         
-        const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(e => { console.error("Error fetching group metadata:", e); return null; }) : null;
+        const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(e => { console.error("කණ්ඩායම් තොරතුරු ලබාගැනීමේ දෝෂය:", e); return null; }) : null;
         const groupName = groupMetadata ? groupMetadata.subject : '';
         const participants = groupMetadata ? groupMetadata.participants : [];
         const groupAdmins = isGroup && participants.length > 0 ? getGroupAdmins(participants) : [];
@@ -210,18 +228,18 @@ async function connectToWA() {
                     console.error(`[PLUGIN ERROR][${cmdName}]`, e);
                 }
             }
-        } else if (body) { 
+        } else if (body) {
             events.commands.forEach(async (cmdObject) => {
                 if (cmdObject.on) {
                     const commonParams = { from, quoted, body, isCmd: false, command: '', cmdObject, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply };
                     try {
-                        if (cmdObject.on === "body") { 
+                        if (cmdObject.on === "body") {
                             cmdObject.function(conn, mek, m, commonParams);
-                        } else if (cmdObject.on === "text" && q) { 
+                        } else if (cmdObject.on === "text" && q) {
                             cmdObject.function(conn, mek, m, commonParams);
-                        } else if ((cmdObject.on === "image" || cmdObject.on === "photo") && m.type === "imageMessage") { // Use m.type
+                        } else if ((cmdObject.on === "image" || cmdObject.on === "photo") && m.type === "imageMessage") {
                             cmdObject.function(conn, mek, m, commonParams);
-                        } else if (cmdObject.on === "sticker" && m.type === "stickerMessage") { // Use m.type
+                        } else if (cmdObject.on === "sticker" && m.type === "stickerMessage") {
                             cmdObject.function(conn, mek, m, commonParams);
                         }
                     } catch (e) {
@@ -248,7 +266,7 @@ async function startBot() {
             process.exit(1); // Critical error
         }
     }
-    
+
     if (fs.existsSync(authPath)) {
         console.log("Session file found. Connecting to WhatsApp...");
         connectToWA().catch(err => {
