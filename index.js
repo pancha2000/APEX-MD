@@ -48,7 +48,7 @@ async function connectToWA() {
         console.warn("Could not load settings from DB. Using default/hardcoded settings.", error.message);
     }
 
-    console.log("Connecting wa bot 🧬...");
+    console.log("Connecting APEX-MD Wa-BOT 🧬...");
     const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/');
     var { version } = await fetchLatestBaileysVersion();
 
@@ -84,7 +84,7 @@ async function connectToWA() {
                 connectToWA();
             }
         } else if (connection === 'open') {
-            console.log('😼 Installing Plugins... ');
+            console.log('⬇️ Installing APEX-MD Plugins... ');
             const pluginDir = "./plugins/";
             if (fs.existsSync(pluginDir)) {
                 fs.readdirSync(pluginDir).forEach((pluginFile) => {
@@ -96,17 +96,17 @@ async function connectToWA() {
                         }
                     }
                 });
-                console.log('Plugins installed successful ✅');
+                console.log('APEX-MD Plugins installed successful ✅');
             } else {
                 console.warn("Plugins directory not found. No plugins loaded.");
             }
             
-            console.log('Bot connected to WhatsApp ✅');
+            console.log('APEX-MD connected to WhatsApp ✅');
 
             if (ownerNumber && ownerNumber.length > 0 && ownerNumber[0]) {
-                let up = `Wa-BOT connected successful ✅\n\nPREFIX: ${prefix}`;
+                let up = `APEX-MD connected successful ✅\n\nPREFIX: ${prefix}`;
                 conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-                    image: { url: botSettings.ALIVE_IMG || `https://telegra.ph/file/900435c6d3157c98c3c88.jpg` }, // Use ALIVE_IMG from settings
+                    image: { url: botSettings.ALIVE_IMG || `https://imgur.com/a/JVLUBdD` }, // Use ALIVE_IMG from settings
                     caption: up
                 }).catch(e => console.error("Error sending welcome message to owner:", e));
             }
@@ -159,7 +159,7 @@ async function connectToWA() {
 
         const senderNumber = sender.split('@')[0];
         const botNumber = conn.user.id.split(':')[0];
-        const pushname = mek.pushName || 'Sin Nombre'; // mek.pushName is fine
+        const pushname = mek.pushName || 'no name'; // mek.pushName is fine
         const isMe = senderNumber === botNumber; // More direct comparison
         const isOwner = ownerNumber.includes(senderNumber) || isMe;
         const botNumber2 = await jidNormalizedUser(conn.user.id);
