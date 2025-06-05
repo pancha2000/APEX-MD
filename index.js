@@ -16,8 +16,11 @@ const qrcode = require('qrcode-terminal');
 const { sms } = require('./lib/msg'); // downloadMediaMessage is used within sms() or via m.download()
 const axios = require('axios');
 const { File } = require('megajs');
-// mongoose is initialized in mongodb.js
 const path = require('path');
+
+// --- database.js වෙතින් අවශ්‍ය functions import කරන්න ---
+const { getBotSettings, readEnv, updateEnv, connectDB } = require('./lib/database');
+// --- database.js import අවසානය ---
 
 const ownerNumber = ['94701391585'];
 
@@ -26,25 +29,22 @@ const app = express();
 const port = process.env.PORT || 8000;
 
 // Global variable for bot settings, to be populated by readEnv
-let botSettings = {
-    PREFIX: ".", // Default prefix if DB read fails
-    MODE: "public", // Default mode
-    // Add other defaults if necessary
-};
+// ආරම්භක අගයන් database.js හි ඇති getBotSettings() වෙතින් ලබා ගන්න
+let botSettings = getBotSettings();
 let prefix = botSettings.PREFIX;
 
 async function connectToWA() {
-    // connectDB is called before connectToWA in startBot()
+    await connectDB(); // DB සම්බන්ධ කරන්න
+
     // Read environment settings from DB
     try {
-        const { readEnv } = require('./lib/database'); // Moved here to ensure DB is connected
-        const dbSettings = await readEnv();
-        botSettings = { ...botSettings, ...dbSettings }; // Merge DB settings, DB takes precedence
+        // DB එකෙන් settings load කර, global botSettings object එක update කරන්න
+        await readEnv(); // මෙය _botSettings internal variable එක update කරයි
+        botSettings = getBotSettings(); // update වූ _botSettings එකේ copy එකක් ගන්න
         prefix = botSettings.PREFIX || "."; // Update prefix based on new settings
         console.log("Bot settings loaded from DB. Prefix:", prefix, "Mode:", botSettings.MODE);
     } catch (error) {
         console.warn("Could not load settings from DB. Using default/hardcoded settings.", error.message);
-        // prefix remains the default one initialized globally
     }
 
     console.log("Connecting wa bot 🧬...");
@@ -123,9 +123,17 @@ async function connectToWA() {
         if (!m || !m.type) {
             // 'm' හෝ 'm.type' වල ගැටලුවක් ඇත්නම් ලොග් කිරීම හොඳයි
             console.warn("අවවාදය: sms(conn, mek) මගින් වලංගු නොවන 'm' වස්තුවක් හෝ 'm.type' එකක් ලැබී ඇත. පණිවිඩය මඟ හරිනු ලැබේ.");
-            // console.warn("Mek විස්තර:", JSON.stringify(mek, null, 2).substring(0, 500)); // සන්දර්භය සඳහා mek හි කොටසක් ලොග් කරන්න
             return;
         }
+
+        // --- `botSettings` සහ `prefix` අගයන් `messages.upsert` event එක ඇතුලේදීද යාවත්කාලීන කරගන්න ---
+        // මෙය මඟින් command.js හි mode වෙනස් කළ පසු එම වෙනස්කම් ක්ෂණිකව බලපායි.
+        // මෙය සෑම පණිවිඩයකදීම කැඳවීමේ කාර්යක්ෂමතාවය ගැන සලකා බලන්න.
+        // කුඩා බොට් සඳහා මෙය ගැටලුවක් නොවේ, නමුත් විශාල බොට් සඳහා වඩා හොඳ විසඳුමක් යනු
+        // database.js හි ඇති _botSettings object එකට කෙලින්ම යොමු වීමයි (දැන් එසේ සිදු වේ).
+        botSettings = getBotSettings(); // සෑම පණිවිඩයකදීම නවතම settings ලබා ගන්න
+        prefix = botSettings.PREFIX || "."; // prefix ද යාවත්කාලීන කරන්න
+        // --- යාවත්කාලීන කිරීම අවසානය ---
 
         const body = m.body || ''; // Use m.body directly from sms function
         
@@ -142,7 +150,6 @@ async function connectToWA() {
         // --- දෝෂය ඇතිවන ස්ථාන සඳහා නව පරීක්ෂා කිරීම් ආරම්භය ---
         if (!sender) {
             console.error(`[ERROR] m.sender හිස් හෝ අර්ථ දක්වා නැත. Chat: ${m.chat || 'N/A'}, Type: ${m.type || 'N/A'}. පණිවිඩය මඟ හරිනු ලැබේ.`);
-            // වැඩිදුර දෝෂ නිවැරදි කිරීම් සඳහා, 'mek' හෝ 'm' වස්තුව ලොග් කළ හැක, නමුත් ප්‍රවේශම් වන්න.
             return; // ක්‍රෑෂ් වීම වැළැක්වීමට මෙම පණිවිඩය සැකසීම මඟ හරින්න
         }
 
@@ -252,8 +259,9 @@ async function connectToWA() {
 }
 
 async function startBot() {
-    const connectDB = require('./lib/mongodb'); // Ensure path is correct if lib is not top level
-    await connectDB(); // Connect to DB first
+    // connectDB is now called inside connectToWA, so no need to call it again here
+    // const connectDB = require('./lib/database'); // If you want to keep it here, ensure it's only called once
+    // await connectDB(); 
 
     const authPath = path.join(__dirname, 'auth_info_baileys', 'creds.json');
     const authDir = path.join(__dirname, 'auth_info_baileys');
