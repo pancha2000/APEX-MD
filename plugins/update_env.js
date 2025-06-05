@@ -17,19 +17,19 @@ async (conn, mek, m, { q, reply, isOwner }) => {
     if (!isOwner) return reply("මෙම විධානය භාවිතා කළ හැක්කේ බොට් හිමිකරුට පමණි.");
 
     if (!q) {
-        return reply("🙇‍♂️ *Please provide the environment variable and its new value.* \n\nExample: `.update ALIVE_MSG:hello ` or `.update MODE:public`");
+        return reply("🙇‍♂️ *Please provide the environment variable and its new value.* \n\nExample: `.update ALIVE_MSG hello ` or `.update MODE public`");
     }
 
     const delimiterIndex = q.indexOf(':') !== -1 ? q.indexOf(':') : q.indexOf(',');
     if (delimiterIndex === -1) {
-        return reply("🫠 *Invalid format. Please use the format:* `.update KEY:VALUE`");
+        return reply("🫠 *Invalid format. Please use the format:* `.update KEY VALUE`");
     }
 
     const keyToUpdate = q.substring(0, delimiterIndex).trim().toUpperCase();
     const valueToUpdate = q.substring(delimiterIndex + 1).trim();
 
     if (!keyToUpdate) {
-        return reply("🫠 *Invalid format. Key cannot be empty. Use:* `.update KEY:VALUE`");
+        return reply("🫠 *Invalid format. Key cannot be empty. Use:* `.update KEY VALUE`");
     }
 
     const validModes = ['public', 'private', 'groups', 'inbox'];
