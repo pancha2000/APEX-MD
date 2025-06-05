@@ -1,12 +1,13 @@
 const fs = require('fs');
-if (fs.existsSync('config.env')) require('dotenv').config({ path: './config.env' });
-
-function convertToBool(text, fault = 'true') {
-    return text === fault ? true : false;
+if (fs.existsSync('config.env')) {
+    require('dotenv').config({ path: './config.env' });
 }
-module.exports = {
-SESSION_ID: process.env.SESSION_ID || "zRMSTCwB#H_FwZ9v2Ym0SkiujciglUybf0ppTc-XbyHW46gwsR4g",
-MONGODB: process.env.MONGODB || "mongodb+srv://pancha:2006.Shehan@cluster0.hyugfei.mongodb.net/",
-MODE: process.env.MODE || "public"
 
+// convertToBool function was not used, so it's removed.
+// If you need it later, you can re-add it.
+
+module.exports = {
+    SESSION_ID: process.env.SESSION_ID || "zRMSTCwB#H_FwZ9v2Ym0SkiujciglUybf0ppTc-XbyHW46gwsR4g", // Example, replace with your actual default or remove
+    MONGODB: process.env.MONGODB || "mongodb+srv://pancha:2006.Shehan@cluster0.hyugfei.mongodb.net/", // Example
+    MODE: process.env.MODE || "public"
 };
