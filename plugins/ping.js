@@ -1,3 +1,5 @@
+// plugins/ping.js
+
 const config = require('../config')
 let fs = require('fs')
 const { cmd, commands } = require('../command')
@@ -8,7 +10,7 @@ cmd({
     alias: ["speed"],
     desc: "Check bot\'s ping",
     category: "main",
-    use: '.ping',
+    // use: '.ping', // මේ පේලිය අයින් කරන්න, නැත්නම් මේ විදියට comment කරන්න
     filename: __filename
 },
 async(conn, mek, m,{from, l, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
@@ -23,4 +25,3 @@ reply('*Error !!*')
 l(e)
 }
 })
-
