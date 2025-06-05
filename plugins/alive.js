@@ -1,5 +1,6 @@
-const {readEnv} = require('../lib/database')
-const {cmd , commands} = require('../command')
+// plugins/alive.js
+const { readEnv } = require('../lib/database');
+const { cmd } = require('../command'); // Removed 'commands' as it's not used here
 
 cmd({
     pattern: "alive",
@@ -7,15 +8,19 @@ cmd({
     category: "main",
     filename: __filename
 },
-async(conn, mek, m,{from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
-try{
-  const config = await readEnv();
-return await conn.sendMessage(from,{image: {url: config.ALIVE_IMG},caption: config.ALIVE_MSG},{quoted: mek})
-}catch(e){
-console.log(e)
-reply(`${e}`)
-}
-})
+async (conn, mek, m, { from, reply }) => { // Only include needed params
+    try {
+        const config = await readEnv(); // config from DB
+        const aliveMsg = config.ALIVE_MSG || "I am alive!"; // Fallback
+        const aliveImg = config.ALIVE_IMG; // Optional image
 
-
-
+        if (aliveImg) {
+            return await conn.sendMessage(from, { image: { url: aliveImg }, caption: aliveMsg }, { quoted: mek });
+        } else {
+            return await reply(aliveMsg);
+        }
+    } catch (e) {
+        console.error("Error in alive command:", e);
+        reply("😥 (Sorry, an error occurred)."); // User-friendly error
+    }
+});
