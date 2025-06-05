@@ -18,9 +18,10 @@ const axios = require('axios');
 const { File } = require('megajs');
 const path = require('path');
 
-// --- database.js වෙතින් අවශ්‍ය functions import කරන්න ---
-const { getBotSettings, readEnv, updateEnv, connectDB } = require('./lib/database');
-// --- database.js import අවසානය ---
+// --- lib/mongodb.js වෙතින් අවශ්‍ය functions import කරන්න ---
+// lib/database වෙනුවට lib/mongodb යොදන්න
+const { getBotSettings, readEnv, updateEnv, connectDB } = require('./lib/mongodb');
+// --- mongodb.js import අවසානය ---
 
 const ownerNumber = ['94701391585'];
 
@@ -29,7 +30,7 @@ const app = express();
 const port = process.env.PORT || 8000;
 
 // Global variable for bot settings, to be populated by readEnv
-// ආරම්භක අගයන් database.js හි ඇති getBotSettings() වෙතින් ලබා ගන්න
+// ආරම්භක අගයන් mongodb.js හි ඇති getBotSettings() වෙතින් ලබා ගන්න
 let botSettings = getBotSettings();
 let prefix = botSettings.PREFIX;
 
@@ -128,9 +129,6 @@ async function connectToWA() {
 
         // --- `botSettings` සහ `prefix` අගයන් `messages.upsert` event එක ඇතුලේදීද යාවත්කාලීන කරගන්න ---
         // මෙය මඟින් command.js හි mode වෙනස් කළ පසු එම වෙනස්කම් ක්ෂණිකව බලපායි.
-        // මෙය සෑම පණිවිඩයකදීම කැඳවීමේ කාර්යක්ෂමතාවය ගැන සලකා බලන්න.
-        // කුඩා බොට් සඳහා මෙය ගැටලුවක් නොවේ, නමුත් විශාල බොට් සඳහා වඩා හොඳ විසඳුමක් යනු
-        // database.js හි ඇති _botSettings object එකට කෙලින්ම යොමු වීමයි (දැන් එසේ සිදු වේ).
         botSettings = getBotSettings(); // සෑම පණිවිඩයකදීම නවතම settings ලබා ගන්න
         prefix = botSettings.PREFIX || "."; // prefix ද යාවත්කාලීන කරන්න
         // --- යාවත්කාලීන කිරීම අවසානය ---
@@ -260,9 +258,6 @@ async function connectToWA() {
 
 async function startBot() {
     // connectDB is now called inside connectToWA, so no need to call it again here
-    // const connectDB = require('./lib/database'); // If you want to keep it here, ensure it's only called once
-    // await connectDB(); 
-
     const authPath = path.join(__dirname, 'auth_info_baileys', 'creds.json');
     const authDir = path.join(__dirname, 'auth_info_baileys');
 
