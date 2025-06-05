@@ -1,100 +1,45 @@
-const {readEnv} = require('../lib/database')
-const {cmd , commands} = require('../command')
+// plugins/menu.js
+const { readEnv } = require('../lib/database');
+const { cmd, commands } = require('../command'); // Import 'commands' array
 
 cmd({
-
     pattern: "menu",
-
-    react: "🛸",
-
-    alias: ["panel","commands"],
-
-    desc: "Get bot\'s command list.",
-
-    category: "main",
-
-    use: '.menu',
-
-    filename: __filename
-
+    // ...
 },
+async (conn, mek, m, { pushname, from, reply }) => {
+    try {
+        const dbConfig = await readEnv();
+        let menuText = `╭━━━━∙⋆⋅⋆∙━ ─┉─ • ─┉─⊷\n  Hello *${pushname}*\n  Welcome To Pancha-One-Bot Menu\n╰━━━━∙⋆⋅⋆∙━ ─┉─ • ─┉─⊷\n\n`;
 
-async(conn, mek, m,{from, l, quoted, body, isCmd, umarmd, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply}) => {
+        const categories = {};
+        commands.forEach(command => {
+            if (command.dontAddCommandList || !command.pattern) return; // Skip hidden or pattern-less commands
+            if (!categories[command.category]) {
+                categories[command.category] = [];
+            }
+            categories[command.category].push(command);
+        });
 
-try{
-const config = await readEnv();
-let madeMenu = 
-`╭━━━━∙⋆⋅⋆∙━ ─┉─ • ─┉─⊷
+        for (const categoryName in categories) {
+            menuText += `*╭────❒⁠⁠⁠⁠* *${categoryName.toUpperCase()}-CMD* *❒⁠⁠⁠⁠*\n`;
+            categories[categoryName].forEach(c => {
+                menuText += `*┋* .${c.pattern} ${c.use ? c.use.replace('.', '') : ''}\n`; // Display pattern and usage
+                 // menuText += `*┋* → ${c.desc || 'No description'}\n`; // Optionally add description
+            });
+            menuText += `*┕───────────────────❒*\n\n`;
+        }
+        
+        menuText += `> *POWERED BY SHEHAN VIMUKTHI*\n╘✦•·········••••😈•••············•✦`;
 
-  𝑯𝒆𝒍𝒍𝒐𝒘 *${pushname}*
+        const aliveImgUrl = dbConfig.ALIVE_IMG;
+        if (aliveImgUrl) {
+            await conn.sendMessage(from, { image: { url: aliveImgUrl }, caption: menuText }, { quoted: mek });
+        } else {
+            await reply(menuText);
+        }
 
-*♥︎ 𝐖𝐞𝐥𝐜𝐨𝐦𝐞 𝐓𝐨 𝐏𝐚𝐧𝐜𝐡𝐚-𝐎𝐧𝐞-𝐁𝐨𝐭 𝐀𝐥𝐥 𝐌𝐞𝐧𝐮♥︎ ≧◉◡◉≦*
-
- 
-╰━━━━∙⋆⋅⋆∙━ ─┉─ • ─┉─⊷
-
-
-╒✦•··············•••••••••··············•··•✦
-🧬◦ *ɴᴀᴍᴇ ʙᴏᴛ* : 𝑷𝒂𝒏𝒄𝒉𝒂 𝑂𝑛𝑒 𝐵𝑜𝑡
-🧬◦ *ᴄʀᴇᴀᴛᴏʀ* : 𝑆ℎ𝑒ℎ𝑎𝑛 𝑉𝑖𝑚𝑢𝑘𝑡ℎ𝑖 
-🧬◦ *ᴠᴇʀsɪᴏɴs* : ᴠ.2.0.0🐱
-🧬◦ *ᴍᴇɴᴜ ᴄᴍᴅ* : .𝚖𝚎𝚗𝚞
-🧬◦ *ꜱᴜʙꜱᴄʀɪʙᴇ ᴍʏ ʏᴛ ᴄʜᴀɴɴᴇʟ* :  https://youtube.com/@rp_tech_official?si=DOQLSrikDYueKNWf
-🧬◦ *ᴊᴏɪɴ ᴍʏ ᴄʜᴀɴɴᴇʟ* : https://whatsapp.com/channel/0029Vb33F7lCBtx99QQttN1t
-🧬◦ *ᴄᴏɴᴛᴀᴄᴛ ᴡɪᴛʜ sɪʟᴇɴᴛ-ᴋɪʟʟᴇʀ*: https://wa.me/+94701391585?text=Hi_Bot_help
-╘✦•·············•••••••••··················•✦
-
-*╭────❒⁠⁠⁠⁠* *📥 DOWNLOADER-CMD 📥* *❒⁠⁠⁠⁠* 
-*┋*
-*┋* coming soon 
-*┋* 
-*┕───────────────────❒*
-
-*╭────❒⁠⁠⁠⁠* *🔎 SEARCH-CMD 🔍* *❒⁠⁠⁠⁠* 
-*┋* 
-*┋* 
-*┋* coming soon
-*┋* 
-*┕───────────────────❒*
-
-*╭────❒⁠⁠⁠⁠* *🧠 AI-CMD 🧠* *❒⁠⁠⁠⁠* 
-*┋* *.ᴀɪ <ᴛᴇxᴛ>*
-*┋* 
-*┕───────────────────❒*
-
-*╭────❒⁠⁠⁠⁠* *👨‍💻 OWNER-CMD 👨‍💻* *❒⁠⁠⁠⁠* 
-*┋* 
-*┋* *.update*
-*┋* *.ʀᴇꜱᴛᴀʀᴛ*
-*┕───────────────────❒*
-
-*╭────❒⁠⁠⁠⁠* *👥 GROUP-CMD 👥* *❒⁠⁠⁠⁠* 
-*┋* coming soon
-*┕───────────────────❒*
-
-*╭────❒⁠⁠⁠⁠* *📃 INFO-CMD 📃* *❒⁠⁠⁠⁠* 
-*┋* *.ᴍᴇɴᴜ*
-*┋* *.ᴀʟɪᴠᴇ*
-*┋* *.ᴘɪɴɢ*
-*┋* *.ꜱʏꜱᴛᴇᴍ*
-*┕───────────────────❒*
-
-*╭────❒⁠⁠⁠⁠* *🎡 CONVERTER-CMD 🎡* *❒⁠⁠⁠⁠* 
-*┋* coming soon
-*┕───────────────────❒*
-
-
-
-*❒⁠⁠⁠⁠▭▬▭▬▭▬▭👀▭▬▭▬▭▬▭❒*⁠⁠⁠⁠
-
-> *POWERED BY SHEHAN VIMUKTHI*
-╘✦•·········••••😈•••············•✦ 
-`
-
-await conn.sendMessage(from,{image:{url:config.ALIVE_IMG},caption:madeMenu},{quoted:mek})
-
-}catch(e){
-console.log(e)
-reply(`${e}`)
-}
-})
+    } catch (e) {
+        console.error("Error in menu command:", e);
+        reply("😥 An error occurred while generating the menu.");
+    }
+});
