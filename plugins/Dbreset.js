@@ -1,6 +1,4 @@
-// plugins/resetbotsettings.js
 
-// අවශ්‍ය functions සහ defaultEnvVariables `lib/mongodb.js` වෙතින් import කරගන්න
 const { updateEnv, readEnv, getBotSettings, defaultEnvVariables } = require('../lib/mongodb');
 // Command එක register කරන්න `command.js` වෙතින් cmd function එක import කරගන්න
 const { cmd } = require('../command');
