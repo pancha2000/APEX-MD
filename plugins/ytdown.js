@@ -1,114 +1,78 @@
-const ytdl = require('ytdl-core');
-const ffmpeg = require('fluent-ffmpeg');
-const fs = require('fs');
-const path = require('path');
-const fsExtra = require('fs-extra');
-
+// External API හරහා YouTube download කිරීමට අවශ්‍ය dependencies
 const { cmd } = require('../command');
+const { fetchJson } = require('../lib/functions'); // fetchJson function එක ඔබගේ lib/functions.js හි ඇත
 
-const TEMP_DIR = path.join(__dirname, '..', 'tmp_downloads');
-fsExtra.ensureDirSync(TEMP_DIR);
+// !!! වැදගත්: මෙතැනට ඔබ වෙනත් server එකක deploy කළ YouTube API එකේ URL එක දාන්න !!!
+// උදාහරණ: "http://YOUR_DEPLOYED_YOUTUBE_API_URL_HERE"
+// ඔබට ඔබේම API එක deploy කර නොමැතිනම්, ඔබට යම් public API එකක් සොයාගෙන එය භාවිතා කළ හැක.
+// (කලින් තිබූ https://prabath-api.onrender.com වැනි URL එකක් දාන්න පුළුවන්,
+// නමුත් එහි විශ්වසනීයත්වය සහ සීමාවන් API සපයන්නා මත රඳා පවතී)
+const YOUTUBE_DOWNLOAD_API_URL = "http://YOUR_DEPLOYED_YOUTUBE_API_URL_HERE"; // <<<--- මෙය අනිවාර්යයෙන් වෙනස් කරන්න !!!
 
-const yourName = "*APEX-MD*"; // Customize your bot's name
+
+const yourName = "*APEX-MD*"; // ඔබේ bot ගේ නම
 
 
 // --- YouTube Video Downloader (!video / !ytmp4) ---
 cmd({
     pattern: "video",
     alias: ["ytmp4", "ytv"], // 'video' pattern එක, 'ytmp4' සහ 'ytv' alias
-    desc: "Downloads YouTube videos (MP4).",
+    desc: "Downloads YouTube videos (MP4) via API.",
     category: "download",
     react: "📩",
     filename: __filename
 },
 async(conn, mek, m, { from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply }) => {
     try {
-        console.log(`[YTMP4] Command received from ${senderNumber}: !${command} ${q}`); // Debug log
+        console.log(`[YT_API_MP4] Command received from ${senderNumber}: !${command} ${q}`);
 
         if (!q || (!q.startsWith("http://") && !q.startsWith("https://"))) {
-            // direct conn.sendMessage භාවිතය
             await conn.sendMessage(from, { text: "Please provide a YouTube video URL.\n\nExample: `" + global.prfx + "ytmp4 https://www.youtube.com/watch?v=dQw4w9WgXcQ`" }, { quoted: mek });
             return;
         }
 
         const youtubeUrl = q;
 
-        if (!ytdl.validateURL(youtubeUrl)) {
-            console.warn(`[YTMP4] Invalid URL: ${youtubeUrl}`);
-            // direct conn.sendMessage භාවිතය
+        // URL validation (simple check, the API should handle deeper validation)
+        if (!youtubeUrl.includes("youtube.com/watch") && !youtubeUrl.includes("youtu.be/")) {
             await conn.sendMessage(from, { text: 'Invalid YouTube URL provided. Please enter a valid YouTube video link.' }, { quoted: mek });
             return;
         }
 
-        const info = await ytdl.getInfo(youtubeUrl);
-        const title = info.videoDetails.title.replace(/[^a-zA-Z0-9 ]/g, ''); 
-        const videoId = info.videoDetails.videoId;
+        await conn.sendMessage(from, { text: `⌛ Requesting YouTube video from API...\nPlease wait, this may take a moment.` }, { quoted: mek });
 
-        // direct conn.sendMessage භාවිතය
-        await conn.sendMessage(from, { text: `⌛ Processing "${title}"...\nPlease wait, this may take a moment.` }, { quoted: mek });
+        // API call to download YouTube video
+        // pancha2000/youtube-download-api repo එකේ main.js බැලුවම /ytmp4 endpoint එකක් තියෙනවා.
+        let data = await fetchJson(`${YOUTUBE_DOWNLOAD_API_URL}/ytmp4?url=${encodeURIComponent(q)}`); // URL encoding වැදගත්
 
-        const videoFilePath = path.join(TEMP_DIR, `${title}_${videoId}.mp4`);
+        console.log(`[YT_API_MP4] API Response: ${JSON.stringify(data, null, 2)}`); // API response එක ලොග් කරන්න
 
-        if (fs.existsSync(videoFilePath)) {
-            console.log(`[YTMP4] Removing existing file: ${videoFilePath}`);
-            fsExtra.removeSync(videoFilePath);
+        if (!data || data.status !== true || !data.result || !data.result.url) {
+             const errorMessage = data && data.message ? data.message : 'API returned no valid data or an error.';
+             console.error("[YT_API_MP4] API returned no valid data:", errorMessage);
+             return await conn.sendMessage(from, { text: `❌ Failed to download video. API returned: ${errorMessage}. Please check the URL or try again later.` }, { quoted: mek });
         }
 
-        const videoStream = ytdl(youtubeUrl, {
-            quality: 'highestvideo',
-            filter: 'videoonly'
-        });
+        const videoUrl = data.result.url;
+        const title = data.result.title || "YouTube Video"; // API response එකෙන් title ගන්න
 
-        const audioStream = ytdl(youtubeUrl, {
-            quality: 'highestaudio',
-            filter: 'audioonly'
-        });
-
-        await new Promise((resolve, reject) => {
-            ffmpeg()
-                .input(videoStream)
-                .videoCodec('copy')
-                .input(audioStream)
-                .audioCodec('copy')
-                .save(videoFilePath)
-                .on('end', () => {
-                    console.log(`[YTMP4] FFmpeg merge complete for ${title}`);
-                    resolve();
-                })
-                .on('error', (err) => {
-                    console.error('[YTMP4] FFmpeg Video Merge Error:', err);
-                    reject(err);
-                });
-        });
-
-        if (fs.existsSync(videoFilePath)) {
-            console.log(`[YTMP4] Sending video file: ${videoFilePath}`);
-            await conn.sendMessage(
-                from, {
-                    video: { url: videoFilePath },
-                    mimetype: 'video/mp4',
-                    caption: `✅ Successfully downloaded: *${title}*\n\n${yourName}`
-                }, { quoted: mek }
-            );
-            fsExtra.removeSync(videoFilePath);
-            console.log(`[YTMP4] Sent and cleaned up: ${videoFilePath}`);
-        } else {
-            console.error(`[YTMP4] Video file not found after FFmpeg process: ${videoFilePath}`);
-            // direct conn.sendMessage භාවිතය
-            await conn.sendMessage(from, { text: '❌ Failed to download video. The file was not created or found.' }, { quoted: mek });
+        if (!videoUrl) {
+            await conn.sendMessage(from, { text: '❌ Failed to download video. Could not find a downloadable video URL from the API.' }, { quoted: mek });
+            return;
         }
+        
+        // Video file URL එක කෙලින්ම WhatsApp වෙත යවන්න
+        await conn.sendMessage(from, {
+            video: { url: videoUrl },
+            mimetype: 'video/mp4',
+            caption: `✅ Successfully downloaded: *${title}*\n\n${yourName}`
+        }, { quoted: mek });
+
+        console.log(`[YT_API_MP4] Sent video from API: ${videoUrl}`);
 
     } catch (error) {
-        console.error('[YTMP4] Main Error Catch:', error);
-        if (error.message.includes('No video formats found')) {
-            await conn.sendMessage(from, { text: '❌ Could not find downloadable formats for this video. It might be age-restricted, geo-restricted, or private.' }, { quoted: mek });
-        } else if (error.message.includes('status code: 403')) {
-            await conn.sendMessage(from, { text: '❌ YouTube download failed due to a server error (e.g., rate limit, geo-restriction). Please try again later.' }, { quoted: mek });
-        } else {
-            await conn.sendMessage(from, { text: `❌ An error occurred while downloading: ${error.message}` }, { quoted: mek });
-        }
-        fsExtra.emptyDirSync(TEMP_DIR);
-        console.log('[YTMP4] Temporary directory cleared on error.');
+        console.error('[YT_API_MP4] Main Error Catch:', error);
+        await conn.sendMessage(from, { text: `❌ An error occurred while downloading: ${error.message || String(error)}. Please try again later.` }, { quoted: mek });
     }
 });
 
@@ -116,90 +80,63 @@ async(conn, mek, m, { from, quoted, body, isCmd, command, args, q, isGroup, send
 // --- YouTube Song Downloader (!song / !ytmp3) ---
 cmd({
     pattern: "song",
-    alias: ["ytmp3", "yta"], // 'song' pattern එක, 'ytmp3' සහ 'yta' alias
-    desc: "Downloads YouTube songs (MP3).",
+    alias: ["ytmp3", "yta"],
+    desc: "Downloads YouTube songs (MP3) via API.",
     category: "download",
     react: "📩",
     filename: __filename
 },
 async(conn, mek, m, { from, quoted, body, isCmd, command, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply }) => {
     try {
-        console.log(`[YTMP3] Command received from ${senderNumber}: !${command} ${q}`); // Debug log
+        console.log(`[YT_API_MP3] Command received from ${senderNumber}: !${command} ${q}`);
 
         if (!q || (!q.startsWith("http://") && !q.startsWith("https://"))) {
-            // direct conn.sendMessage භාවිතය
             await conn.sendMessage(from, { text: "Please provide a YouTube video URL.\n\nExample: `" + global.prfx + "ytmp3 https://www.youtube.com/watch?v=dQw4w9WgXcQ`" }, { quoted: mek });
             return;
         }
 
         const youtubeUrl = q;
 
-        if (!ytdl.validateURL(youtubeUrl)) {
-            console.warn(`[YTMP3] Invalid URL: ${youtubeUrl}`);
-            // direct conn.sendMessage භාවිතය
+        if (!youtubeUrl.includes("youtube.com/watch") && !youtubeUrl.includes("youtu.be/")) {
             await conn.sendMessage(from, { text: 'Invalid YouTube URL provided. Please enter a valid YouTube video link.' }, { quoted: mek });
             return;
         }
 
-        const info = await ytdl.getInfo(youtubeUrl);
-        const title = info.videoDetails.title.replace(/[^a-zA-Z0-9 ]/g, '');
-        const videoId = info.videoDetails.videoId;
+        await conn.sendMessage(from, { text: `⌛ Requesting YouTube audio from API...\nPlease wait, this may take a moment.` }, { quoted: mek });
 
-        // direct conn.sendMessage භාවිතය
-        await conn.sendMessage(from, { text: `⌛ Processing "${title}"...\nPlease wait, this may take a moment.` }, { quoted: mek });
+        // API call to download YouTube audio
+        // pancha2000/youtube-download-api repo එකේ main.js බැලුවම /ytmp3 endpoint එකක් තියෙනවා.
+        let data = await fetchJson(`${YOUTUBE_DOWNLOAD_API_URL}/ytmp3?url=${encodeURIComponent(q)}`); // URL encoding වැදගත්
 
-        const audioFilePath = path.join(TEMP_DIR, `${title}_${videoId}.mp3`);
-
-        if (fs.existsSync(audioFilePath)) {
-            console.log(`[YTMP3] Removing existing file: ${audioFilePath}`);
-            fsExtra.removeSync(audioFilePath);
+        console.log(`[YT_API_MP3] API Response: ${JSON.stringify(data, null, 2)}`); // API response එක ලොග් කරන්න
+        
+        if (!data || data.status !== true || !data.result || !data.result.url) {
+            const errorMessage = data && data.message ? data.message : 'API returned no valid data or an error.';
+            console.error("[YT_API_MP3] API returned no valid data:", errorMessage);
+            return await conn.sendMessage(from, { text: `❌ Failed to download audio. API returned: ${errorMessage}. Please check the URL or try again later.` }, { quoted: mek });
         }
 
-        await new Promise((resolve, reject) => {
-            ffmpeg(ytdl(youtubeUrl, {
-                    filter: 'audioonly',
-                    quality: 'highestaudio'
-                }))
-                .audioBitrate(128)
-                .save(audioFilePath)
-                .on('end', () => {
-                    console.log(`[YTMP3] FFmpeg conversion complete for ${title}`);
-                    resolve();
-                })
-                .on('error', (err) => {
-                    console.error('[YTMP3] FFmpeg Audio Convert Error:', err);
-                    reject(err);
-                });
-        });
+        const audioUrl = data.result.url;
+        const title = data.result.title || "YouTube Audio"; // API response එකෙන් title ගන්න
 
-        if (fs.existsSync(audioFilePath)) {
-            console.log(`[YTMP3] Sending audio file: ${audioFilePath}`);
-            await conn.sendMessage(
-                from, {
-                    audio: { url: audioFilePath },
-                    mimetype: 'audio/mpeg',
-                    fileName: `${title}.mp3`,
-                    caption: `✅ Successfully downloaded: *${title}*\n\n${yourName}`
-                }, { quoted: mek }
-            );
-            fsExtra.removeSync(audioFilePath);
-            console.log(`[YTMP3] Sent and cleaned up: ${audioFilePath}`);
-        } else {
-            console.error(`[YTMP3] Audio file not found after FFmpeg process: ${audioFilePath}`);
-            // direct conn.sendMessage භාවිතය
-            await conn.sendMessage(from, { text: '❌ Failed to download audio. The file was not created or found.' }, { quoted: mek });
+        if (!audioUrl) {
+            await conn.sendMessage(from, { text: '❌ Failed to download audio. Could not find a downloadable audio URL from the API.' }, { quoted: mek });
+            return;
         }
+
+        // Audio file URL එක කෙලින්ම WhatsApp වෙත යවන්න
+        await conn.sendMessage(from, {
+            audio: { url: audioUrl },
+            mimetype: 'audio/mpeg',
+            fileName: `${title}.mp3`,
+            caption: `✅ Successfully downloaded: *${title}*\n\n${yourName}`
+        }, { quoted: mek }
+        );
+
+        console.log(`[YT_API_MP3] Sent audio from API: ${audioUrl}`);
 
     } catch (error) {
-        console.error('[YTMP3] Main Error Catch:', error);
-        if (error.message.includes('No video formats found')) {
-            await conn.sendMessage(from, { text: '❌ Could not find downloadable formats for this video. It might be age-restricted, geo-restricted, or private.' }, { quoted: mek });
-        } else if (error.message.includes('status code: 403')) {
-            await conn.sendMessage(from, { text: '❌ YouTube download failed due to a server error (e.g., rate limit, geo-restriction). Please try again later.' }, { quoted: mek });
-        } else {
-            await conn.sendMessage(from, { text: `❌ An error occurred while downloading: ${error.message}` }, { quoted: mek });
-        }
-        fsExtra.emptyDirSync(TEMP_DIR);
-        console.log('[YTMP3] Temporary directory cleared on error.');
+        console.error('[YT_API_MP3] Main Error Catch:', error);
+        await conn.sendMessage(from, { text: `❌ An error occurred while downloading: ${error.message || String(error)}. Please try again later.` }, { quoted: mek });
     }
 });
