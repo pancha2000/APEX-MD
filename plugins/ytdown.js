@@ -7,7 +7,7 @@ const { fetchJson } = require('../lib/functions'); // fetchJson function එක 
 // ඔබට ඔබේම API එක deploy කර නොමැතිනම්, ඔබට යම් public API එකක් සොයාගෙන එය භාවිතා කළ හැක.
 // (කලින් තිබූ https://prabath-api.onrender.com වැනි URL එකක් දාන්න පුළුවන්,
 // නමුත් එහි විශ්වසනීයත්වය සහ සීමාවන් API සපයන්නා මත රඳා පවතී)
-const YOUTUBE_DOWNLOAD_API_URL = "http://YOUR_DEPLOYED_YOUTUBE_API_URL_HERE"; // <<<--- මෙය අනිවාර්යයෙන් වෙනස් කරන්න !!!
+const YOUTUBE_DOWNLOAD_API_URL = "https://5b492979-d94b-464a-ac6c-a6efa7c548f7-00-3vgjmmralyswq.pike.replit.dev/"; // <<<--- මෙය අනිවාර්යයෙන් වෙනස් කරන්න !!!
 
 
 const yourName = "*APEX-MD*"; // ඔබේ bot ගේ නම
