@@ -33,5 +33,3 @@ Function: cmd,
 Module: cmd,
 commands,
 };
-
-ේ මගෙ comand.js එක වෙනස්කමක් කරන්න ඕනද
