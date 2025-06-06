@@ -2,15 +2,17 @@
 
 // අවශ්‍ය functions සහ defaultEnvVariables `lib/mongodb.js` වෙතින් import කරගන්න
 const { updateEnv, readEnv, getBotSettings, defaultEnvVariables } = require('../lib/mongodb');
-// Command එක register කරන්න `command.js` වෙතින් addCommand function එක import කරගන්න
-const { addCommand } = require('../command');
+// Command එක register කරන්න `command.js` වෙතින් cmd function එක import කරගන්න
+// මේක කලින් 'addCommand' ලෙස තිබ්බා, දැන් ඔබේ command.js එකේ export කරලා තියෙන 'cmd' භාවිතා කරනවා
+const { cmd } = require('../command');
 
 // Command එක register කරනවා
-addCommand({
-    pattern: 'resetdata', // Command එකේ නම (e.g., .resetbotsettings)
+cmd({ // මෙතන addCommand වෙනුවට cmd භාවිතා කළා
+    pattern: 'resetbotsettings', // Command එකේ නම (e.g., .resetbotsettings)
     desc: 'Resets bot settings (alive message, image, working mode, prefix) to default values.', // Command එකේ විස්තරය
     category: 'owner', // Command එක අයිති category එක (e.g., owner, admin, general)
     react: '🔄', // Command එක run වුනාම bot එක දාන reaction එක (optional)
+    fromMe: true, // This command is fromMe (optional, if you want only the bot to respond to its own actions)
     
     // Command එක run වුනාම execute වෙන function එක
     function: async (conn, mek, m, { isOwner, reply }) => {
