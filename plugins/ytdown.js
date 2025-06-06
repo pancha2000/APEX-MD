@@ -18,8 +18,8 @@ const yourName = "*APEX-MD*"; // ඔබේ bot ගේ නම මෙතනින�
 
 // --- YouTube Video Downloader (!ytmp4) ---
 cmd({
-    pattern: "ytmp4",
-    alias: ["ytv"], // විකල්ප commands
+    pattern: "video",
+    alias: ["ytmp4"], // විකල්ප commands
     desc: "Downloads YouTube videos (MP4).",
     category: "download",
     react: "📩", // command එකට reaction එකක්
@@ -123,8 +123,8 @@ async(conn, mek, m, { from, quoted, body, isCmd, command, args, q, isGroup, send
 
 // --- YouTube Song Downloader (!ytmp3) ---
 cmd({
-    pattern: "ytmp3",
-    alias: ["yta"], // විකල්ප commands
+    pattern: "song",
+    alias: ["ytmp3"], // විකල්ප commands
     desc: "Downloads YouTube songs (MP3).",
     category: "download",
     react: "📩", // command එකට reaction එකක්
