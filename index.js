@@ -17,10 +17,6 @@ const { sms } = require('./lib/msg');
 const axios = require('axios');
 const { File } = require('megajs');
 const path = require('path');
-
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegPath = require('ffmpeg-static');
-ffmpeg.setFfmpegPath(ffmpegPath);
 const { getBotSettings, readEnv, updateEnv, connectDB } = require('./lib/mongodb');
 // --- mongodb.js import අවසානය ---
 
