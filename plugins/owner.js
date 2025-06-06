@@ -23,12 +23,13 @@ let madeMenu = `❁ ════ ❃•◯•❃ ════ ❁
 *ʙᴏᴛ ᴏᴡɴᴇʀ ɪɴғᴏ*
 
 ⇩━━━━━━━━❁━━━━━━━━⇩
-┝ *ɴᴀᴍᴇ:* *Shehan Vimukthi*
-┝ *ᴘᴜʙʟɪᴄ ɴᴀᴍᴇ:* *Real Pancha*
-┝ *ɴɪᴄᴋ ɴᴀᴍᴇ:* *Pancha*
-┝ *ᴀɢᴇ:* *19*
-┝ *ᴄᴏɴᴛᴀᴄᴛ* *wa.me/+94701391585*
-┝ I am not an expert in coding. As far as I know, this bot is built according to my knowledge. I am actually a hydraulic machine technician😅.
+┝ *ɴᴀᴍᴇ:* *${config.OWNER_NAME}*
+┝ *ᴘᴜʙʟɪᴄ ɴᴀᴍᴇ:* *${config.PUBLIC_NAME}*
+┝ *ɴɪᴄᴋ ɴᴀᴍᴇ:* *${config.NICKNAME}*
+┝ *ᴀɢᴇ:* *${config.AGE}*
+┝ *ᴄᴏɴᴛᴀᴄᴛ* *${config.OWNER_CONTACT}*
+┝ About 
+I am not an expert in coding. As far as I know, this bot is built according to my knowledge. I am actually a hydraulic machine technician😅.
 ❁ ════ ❃•⇆•❃ ════ ❁
 
 > *ᴘᴏᴡᴇʀᴇᴅ ʙʏ APEX-MD*
