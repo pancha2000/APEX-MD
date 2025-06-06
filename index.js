@@ -18,6 +18,7 @@ const axios = require('axios');
 const { File } = require('megajs');
 const path = require('path');
 const { getBotSettings, readEnv, updateEnv, connectDB } = require('./lib/mongodb');
+const yts = require('@vreden/youtube-scraper');
 // --- mongodb.js import අවසානය ---
 
 const ownerNumber = ['94701391585'];
