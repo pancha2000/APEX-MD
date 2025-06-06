@@ -24,6 +24,10 @@
     "vm": "^0.1.0",
     "qrcode-terminal": "^0.12.0",
     "mongoose": "8.5.3",
-    "@google/generative-ai":"0.24.1"
+    "@google/generative-ai":"0.24.1",
+    "ytdl-core":"4.11.5",
+    "@types/fluent-ffmpeg":"2.1.27",
+    "@types/ffmpeg-static":"3.0.3",
+    "@types/fs-extra":"11.0.4"
   }
 }
