@@ -19,6 +19,6 @@ module.exports = {
   NICKNAME: "Pancha",
   AGE: "19",
   OWNER_CONTACT: "wa.me/+94701391585",
-  ALIVE_IMG: "https://your-image-link.com/image.jpg"
+  ALIVE_IMG: "https://imgur.com/a/JVLUBdD"
 
 };
