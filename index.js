@@ -13,20 +13,14 @@ const fs = require('fs');
 const P = require('pino');
 const appConfig = require('./config');
 const qrcode = require('qrcode-terminal');
-const { sms } = require('./lib/msg'); // downloadMediaMessage is used within sms() or via m.download()
+const { sms } = require('./lib/msg'); 
 const axios = require('axios');
 const { File } = require('megajs');
 const path = require('path');
-// index.js (or command.js) file එකේ උඩම කොතනක හෝ
+
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('ffmpeg-static');
-
 ffmpeg.setFfmpegPath(ffmpegPath);
-
-// ... rest of your bot's code
-
-// --- lib/mongodb.js වෙතින් අවශ්‍ය functions import කරන්න ---
-// lib/database වෙනුවට lib/mongodb යොදන්න
 const { getBotSettings, readEnv, updateEnv, connectDB } = require('./lib/mongodb');
 // --- mongodb.js import අවසානය ---
 
