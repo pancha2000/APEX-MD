@@ -15,7 +15,8 @@ try{
 let status = `*Uptime:*  ${runtime(process.uptime())}
 *Ram usage:* ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)}MB / ${Math.round(require('os').totalmem / 1024 / 1024)}MB
 *HostName:* ${os.hostname()}
-*Owner:* SHEHAN VIMUKTHI 
+*Owner:* *${config.OWNER_NAME} 
+*POWERED BY APEX-MD*
 `
 return reply(`${status}`)
 }catch(e){
