@@ -2,10 +2,10 @@ const {readEnv} = require('../lib/database')
 const {cmd , commands} = require('../command')
 
 cmd({
-    pattern: "owner",
+    pattern: "creator",
     react: "👑",
     alias: ["king","bot"],
-    desc: "get owner number",
+    desc: "get creator number",
     category: "main",
     filename: __filename
 },
