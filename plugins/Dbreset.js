@@ -7,7 +7,7 @@ const { cmd } = require('../command');
 
 // Command එක register කරනවා
 cmd({ // info object එක මෙතනට
-    pattern: 'resetbotsettings', // Command එකේ නම (e.g., .resetbotsettings)
+    pattern: 'resetdata', // Command එකේ නම (e.g., .resetbotsettings)
     desc: 'Resets bot settings (alive message, image, working mode, prefix) to default values.', // Command එකේ විස්තරය
     category: 'owner', // Command එක අයිති category එක (e.g., owner, admin, general)
     react: '🔄', // Command එක run වුනාම bot එක දාන reaction එක (optional)
