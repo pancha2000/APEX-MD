@@ -78,13 +78,6 @@ caption: 🎥 *${video.title}*\n\nMADE BY APEX-MD,
 { quoted: mek }
 );
 
-reply("Thanks for using my bot! 🎥❤️");
-} catch (e) {
-console.error(e);
-reply(❌ Error: ${e.message});
-}
-
-
 }
 );
 
