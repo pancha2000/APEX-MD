@@ -69,7 +69,7 @@ MADE BY SHEHAN VIMUKYHI`;
               return { buffer: audioBuffer.data, title };
             }
             // බාගත කිරීම අවසන් වන තෙක් තත්පර 5ක් රැඳී සිටියි
-            await new Promise((resolve) => setTimeout(resolve, 5000));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
           }
         } else {
           throw new Error("Failed to fetch audio details or API error.");
