@@ -1,6 +1,6 @@
 const { cmd } = require("../command");
 const yts = require("yt-search");
-const ytdl = require("ytdl-core"); // Make sure this is installed: npm install ytdl-core
+const ytdl = require("@distube/ytdl-core"); // Make sure this is installed: npm install ytdl-core
 const axios = require("axios");
 
 // Helper function to format seconds into a timestamp string (MM:SS or HH:MM:SS)
