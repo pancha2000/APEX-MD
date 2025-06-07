@@ -67,7 +67,7 @@ await conn.sendMessage(
     }
   };
 
-  const quality = "720";
+  const quality = "360";
   const video = await downloadVideo(url, quality);
 
   await conn.sendMessage(
