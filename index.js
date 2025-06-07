@@ -18,6 +18,7 @@ const axios = require('axios');
 const { File } = require('megajs');
 const path = require('path');
 const { getBotSettings, readEnv, updateEnv, connectDB } = require('./lib/mongodb');
+require('./keepAlive')(); // add this at the top
 
 // --- mongodb.js import අවසානය ---
 
