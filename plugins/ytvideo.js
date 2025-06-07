@@ -93,4 +93,3 @@ IGNORE_WHEN_COPYING_END
 }
 );
 
-මේ වගේ song download plugin එකක් හදන්න
