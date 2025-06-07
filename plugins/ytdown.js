@@ -1,122 +1,152 @@
 // plugins/yt.js
 
 const yt = require('yt-search');
-const dylux = require('api-dylux');
+const ytdl = require('ytdl-core');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+ffmpeg.setFfmpegPath(ffmpegPath); // FFmpeg path එක සකසන්න
 
-// command.js ගොනුවෙන් cmd ශ්‍රිතය import කරගන්න.
-// ඔබගේ plugins ෆෝල්ඩරය root folder එකට සාපේක්ෂව command.js ගොනුවට පිවිසීමට '..' අවශ්‍ය වේ.
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto'); // අහඹු ගොනු නම් සෑදීමට
+
+// command.js ගොනුවෙන් cmd ශ්‍රිතය import කරගන්න
 const { cmd } = require('../command'); 
 
-// --- SONG COMMAND ---
-// YouTube ගීත බාගත කිරීම සඳහා විධානය
-cmd({
-    pattern: 'song', // විධානය ක්‍රියාත්මක කිරීමට භාවිතා කරන රටාව (උදා: /song)
-    desc: 'YouTube ගීත බාගත කරන්න (MP3).', // විධානයේ විස්තරය
-    usage: '<search query>', // භාවිතය පිළිබඳ උපදෙස්
-    category: 'downloads', // ඔබගේ commands සඳහා ඇති category එකක් මෙහි සඳහන් කරන්න
-    filename: __filename, // මෙම ප්ලගිනයේ ගොනු නාමය
-    react: '🎶' // විධානය ක්‍රියාත්මක වන විට බොට් එක යවන reaction emoji එක
-}, async (conn, mek, m, { q, reply }) => {
-    // q: විධානයෙන් පසු ඇති සියලු arguments string එකක් ලෙස
-    // reply: index.js මගින් සපයන ලද message.reply වැනි ක්‍රියාකාරීත්වය සහිත ශ්‍රිතය
-    // conn: Baileys connection object එක (ඔබේ index.js මගින් conn.sendFileUrl එකට මෙය අවශ්‍ය වේ)
-    // m: sms.js මගින් සකස් කරන ලද simplified message object එක (m.chat, m.quoted වැනි දේ ඇත)
+// තාවකාලික ගොනු ගබඩා කිරීමට temp ෆෝල්ඩරය සාදන්න (exist නැත්නම්)
+const tempDir = path.join(__dirname, '..', 'temp');
+if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+}
 
+// --- SONG COMMAND (/song) ---
+cmd({
+    pattern: 'song',
+    desc: 'YouTube ගීත බාගත කරන්න (MP3).',
+    usage: '<search query>',
+    category: 'downloads',
+    filename: __filename,
+    react: '🎶'
+}, async (conn, mek, m, { q, reply }) => {
     if (!q) {
         return reply("ඔබට අවශ්‍ය ගීතය සෙවීමට නමක් සඳහන් කරන්න.\nභාවිතය: `/song <song name>`\nඋදා: `/song Faded Alan Walker`");
     }
 
     await reply("සොයමින් සිටී... කරුණාකර රැඳී සිටින්න.");
 
-    try {
-        // YouTube හි වීඩියෝ සොයන්න
-        const videos = await yt.search(q);
+    let tempFilePath = ''; // තාවකාලික ගොනුවේ path එක ගබඩා කිරීමට
 
+    try {
+        const videos = await yt.search(q);
         if (!videos.videos.length) {
             return reply("මට කිසිදු ගීතයක් සොයාගත නොහැකි විය. කරුණාකර වෙනත් නමක් උත්සාහ කරන්න.");
         }
 
-        // පළමු ප්‍රතිඵලය තෝරා ගන්න
         const video = videos.videos[0];
-
         await reply(`'${video.title}' ගීතය බාගත කරමින් සිටී... (මෙයට ටික වේලාවක් ගත විය හැක)`);
 
-        // api-dylux භාවිතයෙන් MP3 බාගත කරන්න
-        const downloadResult = await dylux.ytmp3(video.url);
+        // තාවකාලික MP3 ගොනුවක් සඳහා අහඹු නමක් සාදන්න
+        const randomName = crypto.randomBytes(8).toString('hex');
+        tempFilePath = path.join(tempDir, `${randomName}.mp3`);
 
-        if (!downloadResult || !downloadResult.url) {
-            return reply(`'${video.title}' ගීතය බාගත කිරීමේදී දෝෂයක් සිදුවිය. අසම්පූර්ණ ප්‍රතිචාරයක් ලැබුණි.`);
-        }
+        // ytdl-core භාවිතයෙන් audio stream එක ලබාගෙන FFmpeg මගින් MP3 බවට පරිවර්තනය කරන්න.
+        const audioStream = ytdl(video.url, { filter: 'audioonly', quality: 'highestaudio' });
 
-        const captionText = `*${downloadResult.title}*\n\n_බාගත කිරීමේ සබැඳිය:_ ${downloadResult.url}\n_ගොනු ප්‍රමාණය:_ ${downloadResult.filesize || 'N/A'}`;
+        await new Promise((resolve, reject) => {
+            ffmpeg(audioStream)
+                .audioBitrate(128) // 128 kbps bitrate
+                .save(tempFilePath)
+                .on('end', resolve)
+                .on('error', reject);
+        });
 
-        // ඔබගේ index.js මගින් conn object එකට එකතු කරන ලද sendFileUrl ශ්‍රිතය භාවිතා කරන්න.
-        // මෙය මගින් Baileys හරහා ගොනු යැවීම වඩාත් පහසු සහ කාර්යක්ෂම වේ.
-        await conn.sendFileUrl(m.chat, downloadResult.url, captionText, m);
+        // ගොනුව යවන්න (Baileys' conn.sendMessage භාවිතයෙන්)
+        // Note: conn.sendFileUrl expects a URL, so we use conn.sendMessage directly for local files.
+        await conn.sendMessage(m.chat, { 
+            audio: fs.readFileSync(tempFilePath), // ගොනුව buffer එකක් ලෙස කියවන්න
+            mimetype: 'audio/mpeg', // MP3 mimetype
+            fileName: `${video.title}.mp3`,
+            ptt: false // Voice note නොවීමට (optional)
+        }, { quoted: m });
+
+        await reply(`මෙන්න ඔබේ ගීතය: *${video.title}*`);
 
     } catch (error) {
-        console.error("YouTube Song Download Error:", error);
-        // දෝෂය පිළිබඳව පරිශීලකයාට දැනුම් දෙන්න.
-        if (error.message.includes("403") || error.message.includes("failed to retrieve")) {
-            await reply("බාගත කිරීමේදී දෝෂයක් සිදුවිය. සමහරවිට මෙම ගීතය බාගත කිරීමට නොහැකි විය හැක (උදා: වයස සීමා කළ).");
+        console.error("YouTube Song Download Error (YTDL):", error);
+        if (error.message.includes("403") || error.message.includes("age-restricted")) {
+            await reply("බාගත කිරීමේදී දෝෂයක් සිදුවිය. සමහරවිට මෙම ගීතය වයස සීමා කළ හෝ භූගෝලීය සීමා සහිත එකක් විය හැක.");
         } else {
             await reply("ගීතය බාගත කිරීමේදී දෝෂයක් සිදුවිය. කරුණාකර නැවත උත්සාහ කරන්න.");
+        }
+    } finally {
+        // බාගත කිරීම අවසන් වූ පසු හෝ දෝෂයක් සිදුවූ පසු තාවකාලික ගොනුව මකා දමන්න
+        if (fs.existsSync(tempFilePath)) {
+            fs.unlinkSync(tempFilePath);
         }
     }
 });
 
-// --- VIDEO COMMAND ---
-// YouTube වීඩියෝ බාගත කිරීම සඳහා විධානය
+// --- VIDEO COMMAND (/video) ---
 cmd({
-    pattern: 'video', // විධානය ක්‍රියාත්මක කිරීමට භාවිතා කරන රටාව (උදා: /video)
-    desc: 'YouTube වීඩියෝ බාගත කරන්න (MP4).', // විධානයේ විස්තරය
-    usage: '<search query>', // භාවිතය පිළිබඳ උපදෙස්
-    category: 'downloads', // ඔබගේ commands සඳහා ඇති category එකක් මෙහි සඳහන් කරන්න
-    filename: __filename, // මෙම ප්ලගිනයේ ගොනු නාමය
-    react: '🎬' // විධානය ක්‍රියාත්මක වන විට බොට් එක යවන reaction emoji එක
+    pattern: 'video',
+    desc: 'YouTube වීඩියෝ බාගත කරන්න (MP4).',
+    usage: '<search query>',
+    category: 'downloads',
+    filename: __filename,
+    react: '🎬'
 }, async (conn, mek, m, { q, reply }) => {
-    // q: විධානයෙන් පසු ඇති සියලු arguments string එකක් ලෙස
-    // reply: index.js මගින් සපයන ලද message.reply වැනි ක්‍රියාකාරීත්වය සහිත ශ්‍රිතය
-    // conn: Baileys connection object එක
-    // m: sms.js මගින් සකස් කරන ලද simplified message object එක
-
     if (!q) {
         return reply("ඔබට අවශ්‍ය වීඩියෝව සෙවීමට නමක් සඳහන් කරන්න.\nභාවිතය: `/video <video name>`\nඋදා: `/video How to Train Your Dragon trailer`");
     }
 
     await reply("සොයමින් සිටී... කරුණාකර රැඳී සිටින්න.");
 
-    try {
-        // YouTube හි වීඩියෝ සොයන්න
-        const videos = await yt.search(q);
+    let tempFilePath = ''; // තාවකාලික ගොනුවේ path එක ගබඩා කිරීමට
 
+    try {
+        const videos = await yt.search(q);
         if (!videos.videos.length) {
             return reply("මට කිසිදු වීඩියෝවක් සොයාගත නොහැකි විය. කරුණාකර වෙනත් නමක් උත්සාහ කරන්න.");
         }
 
-        // පළමු ප්‍රතිඵලය තෝරා ගන්න
         const video = videos.videos[0];
-
         await reply(`'${video.title}' වීඩියෝව බාගත කරමින් සිටී... (මෙයට ටික වේලාවක් ගත විය හැක)`);
 
-        // api-dylux භාවිතයෙන් MP4 බාගත කරන්න
-        const downloadResult = await dylux.ytmp4(video.url);
+        // තාවකාලික MP4 ගොනුවක් සඳහා අහඹු නමක් සාදන්න
+        const randomName = crypto.randomBytes(8).toString('hex');
+        tempFilePath = path.join(tempDir, `${randomName}.mp4`);
 
-        if (!downloadResult || !downloadResult.url) {
-            return reply(`'${video.title}' වීඩියෝව බාගත කිරීමේදී දෝෂයක් සිදුවිය. අසම්පූර්ණ ප්‍රතිචාරයක් ලැබුණි.`);
-        }
+        // ytdl-core භාවිතයෙන් වීඩියෝ stream එක ලබාගෙන ගොනුවක් ලෙස save කරන්න.
+        // Highest quality MP4 format with both video and audio
+        const videoStream = ytdl(video.url, { filter: format => format.container === 'mp4' && format.hasVideo && format.hasAudio, quality: 'highest' });
+        
+        await new Promise((resolve, reject) => {
+            const fileStream = fs.createWriteStream(tempFilePath);
+            videoStream.pipe(fileStream);
+            fileStream.on('finish', resolve);
+            fileStream.on('error', reject);
+            videoStream.on('error', reject); // Catch stream errors
+        });
 
-        const captionText = `*${downloadResult.title}*\n\n_බාගත කිරීමේ සබැඳිය:_ ${downloadResult.url}\n_ගොනු ප්‍රමාණය:_ ${downloadResult.filesize || 'N/A'}`;
-
-        // ඔබගේ index.js මගින් conn object එකට එකතු කරන ලද sendFileUrl ශ්‍රිතය භාවිතා කරන්න.
-        await conn.sendFileUrl(m.chat, downloadResult.url, captionText, m);
+        // ගොනුව යවන්න (Baileys' conn.sendMessage භාවිතයෙන්)
+        await conn.sendMessage(m.chat, { 
+            video: fs.readFileSync(tempFilePath), // ගොනුව buffer එකක් ලෙස කියවන්න
+            mimetype: 'video/mp4', // MP4 mimetype
+            fileName: `${video.title}.mp4`,
+            caption: `මෙන්න ඔබේ වීඩියෝව: *${video.title}*`
+        }, { quoted: m });
 
     } catch (error) {
-        console.error("YouTube Video Download Error:", error);
-        if (error.message.includes("403") || error.message.includes("failed to retrieve")) {
-            await reply("බාගත කිරීමේදී දෝෂයක් සිදුවිය. සමහරවිට මෙම වීඩියෝව බාගත කිරීමට නොහැකි විය හැක (උදා: වයස සීමා කළ).");
+        console.error("YouTube Video Download Error (YTDL):", error);
+        if (error.message.includes("403") || error.message.includes("age-restricted")) {
+            await reply("බාගත කිරීමේදී දෝෂයක් සිදුවිය. සමහරවිට මෙම වීඩියෝව වයස සීමා කළ හෝ භූගෝලීය සීමා සහිත එකක් විය හැක.");
         } else {
             await reply("වීඩියෝව බාගත කිරීමේදී දෝෂයක් සිදුවිය. කරුණාකර නැවත උත්සාහ කරන්න.");
+        }
+    } finally {
+        // බාගත කිරීම අවසන් වූ පසු හෝ දෝෂයක් සිදුවූ පසු තාවකාලික ගොනුව මකා දමන්න
+        if (fs.existsSync(tempFilePath)) {
+            fs.unlinkSync(tempFilePath);
         }
     }
 });
