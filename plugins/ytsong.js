@@ -92,10 +92,7 @@ MADE BY SHEHAN VIMUKYHI`;
         { quoted: mek }
       );
 
-      reply("*Thanks for using my bot! Enjoy your song!* 🎶❤️"); // අවසාන පණිවිඩය වෙනස් කර ඇත
-    } catch (e) {
-      console.error(e);
-      reply(`❌ Error: ${e.message}`);
+      
     }
   }
 );
