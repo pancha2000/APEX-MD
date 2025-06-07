@@ -1,14 +1,7 @@
 const { cmd } = require("../command");
 const yts = require("yt-search");
 const axios = require("axios");
-const ytdl = require('ytdl-core'); // Add this for potential future direct downloading or better URL validation
-const ffmpeg = require('fluent-ffmpeg'); // If you plan to convert to MP3/other formats
-const ffmpegStatic = require('ffmpeg-static'); // If you use ffmpeg
 
-// Configure FFmpeg path if needed (only if you use ytdl-core for direct downloads/conversions)
-if (ffmpegStatic) {
-    ffmpeg.setFfmpegPath(ffmpegStatic);
-}
 
 
 cmd(
@@ -91,7 +84,7 @@ cmd(
                             });
                             return { buffer: videoBufferResponse.data, title };
                         }
-                        await new Promise((resolve) => setTimeout(resolve, 5000)); // Wait 5 seconds before polling again
+                        await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before polling again
                     }
                 } else {
                     throw new Error(response.data?.message || "Failed to fetch video details from API.");
