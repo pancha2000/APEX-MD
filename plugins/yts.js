@@ -6,7 +6,7 @@ const axios = require("axios"); // axios already imported
 const NEOXR_BASE_URL = "https://api.neoxr.eu";
 // Replace 'YOUR_NEOXR_API_KEY_HERE' with your actual Neoxr API Key.
 // IMPORTANT: For production, use process.env.NEOXR_API_KEY to keep your key secure.
-const NEOXR_API_KEY = "YOUR_NEOXR_API_KEY_HERE"; 
+const NEOXR_API_KEY = "gfF9pr"; //fKRtnMYMW08
 // Example from screenshot: "gfF9pr". You need your own.
 
 // Helper function to format seconds into a timestamp string (MM:SS or HH:MM:SS)
