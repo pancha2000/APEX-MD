@@ -1,6 +1,6 @@
 const { cmd } = require("../command");
 const yts = require("yt-search");
-const axios = require("axios");
+const axios = require("axios"); // Make sure axios is imported
 
 // Helper function to format seconds into a timestamp string (MM:SS or HH:MM:SS)
 function formatSecondsToTimestamp(totalSeconds) {
@@ -15,6 +15,75 @@ function formatSecondsToTimestamp(totalSeconds) {
   parts.push(String(seconds).padStart(2, '0'));
   return parts.join(':');
 }
+
+// --- NEW HELPER FUNCTION: To extract YouTube Video ID ---
+function extractVideoId(url) {
+  const match = url.match(/(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=|embed\/|v\/|)([\w-]{11})(?:\S+)?/);
+  return match ? match[1] : null;
+}
+
+// --- NEW FUNCTION: To download audio using RapidAPI ---
+async function downloadAudioRapidAPI(youtubeUrl) {
+  const videoId = extractVideoId(youtubeUrl);
+  if (!videoId) {
+    throw new Error('Invalid YouTube URL or video ID not found.');
+  }
+
+  const options = {
+    method: 'GET',
+    url: 'https://youtube-media-downloader.p.rapidapi.com/v2/video/details',
+    params: {
+      videoId: videoId,
+      urlAccess: 'normal',
+      videos: 'auto', // You can set this to 'false' if you only need audio, or 'auto' to get all
+      audios: 'auto' // Set to 'auto' to get all available audio qualities
+    },
+    headers: {
+      // ** IMPORTANT: REPLACE WITH YOUR ACTUAL RAPIDAPI KEY **
+      'x-rapidapi-key': '7fe4b1157dmsh575ef6592b6e2eap18615cjsn670c894bd2bb', // Your key from the provided example
+      'x-rapidapi-host': 'youtube-media-downloader.p.rapidapi.com'
+    }
+  };
+
+  try {
+    const response = await axios.request(options);
+
+    if (response.data.status !== 'ok' || !response.data.data || !response.data.data.audios || response.data.data.audios.length === 0) {
+      throw new Error('RapidAPI: Failed to get audio details or no audio streams found.');
+    }
+
+    const audioStreams = response.data.data.audios;
+    const title = response.data.data.title; // Get the title from the RapidAPI response
+
+    // --- Logic to pick the best audio stream ---
+    // This example prioritizes 'mp3' format, then falls back to the first available stream.
+    // You might need to adjust this based on the actual qualities/formats returned by the API
+    // and your preference (e.g., highest bitrate, smallest size, etc.).
+    let bestAudio = audioStreams.find(stream => stream.format === 'mp3' || stream.format === 'm4a');
+    
+    // If no specific format found, just take the first one
+    if (!bestAudio) {
+      bestAudio = audioStreams[0];
+    }
+
+    if (!bestAudio || !bestAudio.url) {
+      throw new Error('RapidAPI: No suitable audio stream found to download.');
+    }
+
+    // Download the audio buffer
+    const audioBufferResponse = await axios.get(bestAudio.url, { responseType: 'arraybuffer' });
+    
+    // Determine the mimetype dynamically if possible, otherwise default to 'audio/mpeg'
+    const mimetype = bestAudio.format === 'm4a' ? 'audio/mp4' : 'audio/mpeg'; // For mp3 use audio/mpeg
+
+    return { buffer: audioBufferResponse.data, title: title || 'Downloaded Audio', mimetype: mimetype };
+
+  } catch (error) {
+    console.error("Error with RapidAPI download:", error.response ? error.response.data : error.message);
+    throw new Error("Failed to download audio via RapidAPI: " + (error.response?.data?.message || error.message || 'Unknown error'));
+  }
+}
+
 
 cmd(
   {
@@ -87,38 +156,10 @@ MADE BY SHEHAN VIMUKYHI`;
         { quoted: mek }
       );
 
-      const downloadAudio = async (url) => {
-        const apiUrl = `https://p.oceansaver.in/ajax/download.php?format=mp3&url=${encodeURIComponent(
-          url
-        )}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`; // Your API Key is hardcoded here. Be cautious if this is public.
-
-        const response = await axios.get(apiUrl);
-
-        if (response.data && response.data.success) {
-          const { id, title } = response.data;
-          const progressUrl = `https://p.oceansaver.in/ajax/progress.php?id=${id}`;
-
-          while (true) {
-            const progress = await axios.get(progressUrl);
-            if (progress.data.success && progress.data.progress === 1000) {
-              const audioBuffer = await axios.get(
-                progress.data.download_url,
-                {
-                  responseType: "arraybuffer",
-                }
-              );
-              return { buffer: audioBuffer.data, title };
-            }
-            await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before checking progress again
-          }
-        } else {
-          throw new Error("Failed to fetch audio details or API error: " + (response.data ? JSON.stringify(response.data) : 'Unknown error'));
-        }
-      };
-
       reply("*⏳ Downloading your song... Please wait!*");
 
-      const audio = await downloadAudio(url);
+      // --- REPLACE THE OLD downloadAudio CALL WITH THE NEW ONE ---
+      const audio = await downloadAudioRapidAPI(url); 
 
       const cleanTitle = audio.title.replace(/[\\/:*?"<>|]/g, ""); // Remove invalid characters from filename
 
@@ -126,8 +167,8 @@ MADE BY SHEHAN VIMUKYHI`;
         from,
         {
           audio: audio.buffer,
-          mimetype: "audio/mpeg",
-          fileName: `${cleanTitle}.mp3`,
+          mimetype: audio.mimetype || "audio/mpeg", // Use dynamic mimetype or default
+          fileName: `${cleanTitle}.mp3`, // Can change extension based on actual format if needed
           ptt: false // Set to true if you want to send as voice message
         },
         { quoted: mek }
