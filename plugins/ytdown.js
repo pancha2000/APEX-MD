@@ -1,7 +1,7 @@
 import fetch from 'node-fetch'; // Add node-fetch for downloading the final buffer
 import { cmd } from "../command"; // Assumes this is how your command handler is imported
 import yts from "yt-search"; // Used for YouTube search and getting video info
-import api from 'api-qasim'; // Import api-qasim (make sure it's installed: npm install api-qasim)
+import Qasim from 'api-qasim'; // Corrected import based on api-qasim documentation
 
 // Helper function to format seconds into a timestamp string (MM:SS or HH:MM:SS)
 function formatSecondsToTimestamp(totalSeconds) {
@@ -48,6 +48,8 @@ async function handleYouTubeDownload(conn, mek, m, { from, q, reply, command, ar
         // Remove the quality from the search query 'q'
         q = q.substring(0, q.lastIndexOf(potentialQuality)).trim();
         if (!q) return reply(`Please provide a ${downloadType} name or link along with the quality. (e.g., \`${exampleCommand} 720\`)`);
+        // Inform the user that quality selection might not work directly with this API.
+        reply(`⚠️ Note: The API Qasim's \`ytmp4\` function might not support specific quality selection (${requestedQuality}p) directly. It will download the default quality available from the API.`);
       }
     }
   }
@@ -112,30 +114,37 @@ async function handleYouTubeDownload(conn, mek, m, { from, q, reply, command, ar
     // --- NEW DOWNLOAD LOGIC USING api-qasim and node-fetch ---
     reply(`*⏳ Downloading your ${downloadType} in ${isVideo ? requestedQuality + 'p' : ''}... Please wait!*`);
 
-    let downloadResult;
+    let rawDownloadResult; // This will hold the direct response from Qasim
+    let downloadResult;    // This will hold the parsed data (e.g., rawDownloadResult.data)
+
     try {
         if (isVideo) {
-            // **IMPORTANT: Replace with actual api-qasim function call for MP4 download**
-            // Example: api.youtube.mp4(ytVideoUrl, requestedQuality);
-            // Example: api.youtube.getmp4(ytVideoUrl, { quality: requestedQuality });
-            downloadResult = await api.youtube.mp4(ytVideoUrl, requestedQuality); // Placeholder. Check API Qasim Docs!
+            // According to api-qasim docs, ytmp4 only takes the URL. Quality selection might not be supported.
+            rawDownloadResult = await Qasim.ytmp4(ytVideoUrl);
         } else {
-            // **IMPORTANT: Replace with actual api-qasim function call for MP3 download**
-            // Example: api.youtube.mp3(ytVideoUrl);
-            // Example: api.youtube.getmp3(ytVideoUrl);
-            downloadResult = await api.youtube.mp3(ytVideoUrl); // Placeholder. Check API Qasim Docs!
+            // According to api-qasim docs, ytmp3 only takes the URL.
+            rawDownloadResult = await Qasim.ytmp3(ytVideoUrl);
+        }
+
+        // Check if the response has a 'data' property (common for api-qasim)
+        if (rawDownloadResult && rawDownloadResult.data) {
+            downloadResult = rawDownloadResult.data;
+        } else {
+            // If no .data, assume the direct result is the download object itself
+            downloadResult = rawDownloadResult;
         }
 
         // Validate the downloadResult structure from api-qasim
         // It's expected to have a 'url' property for the direct download link
         if (!downloadResult || typeof downloadResult !== 'object' || !downloadResult.url) {
-            console.error("api-qasim download result invalid:", downloadResult);
-            throw new Error("Invalid download result structure from API Qasim. Check API Qasim documentation.");
+            console.error("API Qasim raw result:", rawDownloadResult);
+            console.error("API Qasim parsed result:", downloadResult);
+            throw new Error("Invalid download result structure from API Qasim. 'url' property not found in the response. The API might have changed or returned an unexpected format.");
         }
     } catch (apiError) {
-        console.error("API Qasim error:", apiError);
+        console.error("API Qasim error during download link retrieval:", apiError);
         await m.react('❌');
-        return reply(`❌ Error fetching ${downloadType} details from APEX-MD API. It might not support this video or quality, or API Qasim returned an error: ${apiError.message || apiError}.`);
+        return reply(`❌ Error fetching ${downloadType} details from APEX-MD API. It might not support this video or quality, or API Qasim returned an error: ${apiError.message || "Unknown API error"}.`);
     }
 
     const directDownloadLink = downloadResult.url;
@@ -152,7 +161,7 @@ async function handleYouTubeDownload(conn, mek, m, { from, q, reply, command, ar
     } catch (fetchError) {
         console.error("node-fetch download error:", fetchError);
         await m.react('❌');
-        return reply(`❌ Error downloading the ${downloadType} file. The download link might be broken, temporary, or network issue: ${fetchError.message || fetchError}.`);
+        return reply(`❌ Error downloading the ${downloadType} file. The download link might be broken, temporary, or a network issue: ${fetchError.message || "Unknown network error"}.`);
     }
 
     const cleanTitle = downloadedTitle.replace(/[\\/:*?"<>|]/g, ""); // Remove invalid characters for filename
@@ -212,13 +221,13 @@ cmd(
 // ----------------------------------------------------
 cmd(
   {
-    pattern: "audio",
+    pattern: "song",
     react: "🎵",
     desc: "Download YouTube Audio (MP3)",
     category: "download",
     filename: __filename,
   },
-  async (conn, mek, m, { from, q, reply, command, args, q, isGroup, sender, reply }) => {
+  async (conn, mek, m, { from, q, reply, command, args, isGroup, sender }) => { // Corrected args destructuring
     await handleYouTubeDownload(conn, mek, m, { from, q, reply, command, args, isVideo: false });
   }
 );
