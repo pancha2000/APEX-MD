@@ -1,6 +1,13 @@
 const { cmd } = require("../command");
 const yts = require("yt-search");
-const axios = require("axios");
+const axios = require("axios"); // axios already imported
+
+// --- NEOXR API CONFIGURATION ---
+const NEOXR_BASE_URL = "https://api.neoxr.eu";
+// Replace 'YOUR_NEOXR_API_KEY_HERE' with your actual Neoxr API Key.
+// IMPORTANT: For production, use process.env.NEOXR_API_KEY to keep your key secure.
+const NEOXR_API_KEY = "YOUR_NEOXR_API_KEY_HERE"; 
+// Example from screenshot: "gfF9pr". You need your own.
 
 // Helper function to format seconds into a timestamp string (MM:SS or HH:MM:SS)
 function formatSecondsToTimestamp(totalSeconds) {
@@ -20,7 +27,7 @@ cmd(
   {
     pattern: "song", // Command trigger
     react: "🎶",
-    desc: "Download YouTube Song/Audio",
+    desc: "Download YouTube Song/Audio using Neoxr API",
     category: "download",
     filename: __filename,
   },
@@ -36,14 +43,15 @@ cmd(
       // Regular expression to check if 'q' is a YouTube URL
       const ytUrlRegex = /(?:https?:\/\/)?(?:www\.)?(?:m\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=|embed\/|v\/|)([\w-]{11})(?:\S+)?/g;
 
-      let videoInfo; // This object will store the standardized video details
+      let videoInfo; // This object will store the standardized video details from yts
 
       if (ytUrlRegex.test(q)) {
-        // If 'q' is a YouTube URL, try to get info directly
+        // If 'q' is a YouTube URL, try to get info directly using yts.getInfo
         try {
           const info = await yts.getInfo(q);
           // Map yts.getInfo structure to a consistent format
           videoInfo = {
+            id: info.videoDetails.videoId,
             title: info.videoDetails.title,
             url: info.videoDetails.video_url,
             thumbnail: info.videoDetails.thumbnails[info.videoDetails.thumbnails.length - 1].url, // Get largest thumbnail
@@ -54,10 +62,9 @@ cmd(
           };
         } catch (e) {
           console.error("Error getting info for YouTube URL via yts.getInfo:", e);
-          // Fallback to search if direct info fails for a URL (e.g., malformed URL, API error)
           reply("⚠️ Could not get exact information for the provided YouTube link directly. Attempting to search instead...");
           const search = await yts(q);
-          videoInfo = search.videos[0];
+          videoInfo = search.videos[0]; // Fallback to search if direct info fails
         }
       } else {
         // If not a URL, perform a regular search
@@ -67,9 +74,9 @@ cmd(
 
       if (!videoInfo) return reply("❌ No song found for your query.");
 
-      const url = videoInfo.url; // The YouTube URL for the video
+      const youtubeUrlToDownload = videoInfo.url; // The YouTube URL for the video, used for Neoxr API
 
-      // Song info message using the standardized videoInfo object
+      // Song info message using the standardized videoInfo object from yts
       let desc = `🎶 *APEX-MD SONG DOWNLOADER* 🎶
 
 👻 *Title* : ${videoInfo.title}
@@ -87,53 +94,70 @@ MADE BY SHEHAN VIMUKYHI`;
         { quoted: mek }
       );
 
-      const downloadAudio = async (url) => {
-        const apiUrl = `https://p.oceansaver.in/ajax/download.php?format=mp3&url=${encodeURIComponent(
-          url
-        )}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`; // Your API Key is hardcoded here. Be cautious if this is public.
+      reply("*⏳ Fetching audio details from Neoxr API... Please wait!*");
 
-        const response = await axios.get(apiUrl);
-
-        if (response.data && response.data.success) {
-          const { id, title } = response.data;
-          const progressUrl = `https://p.oceansaver.in/ajax/progress.php?id=${id}`;
-
-          while (true) {
-            const progress = await axios.get(progressUrl);
-            if (progress.data.success && progress.data.progress === 1000) {
-              const audioBuffer = await axios.get(
-                progress.data.download_url,
-                {
-                  responseType: "arraybuffer",
-                }
-              );
-              return { buffer: audioBuffer.data, title };
-            }
-            await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds before checking progress again
+      // --- Call Neoxr API for Audio Download ---
+      try {
+        const neoxrResponse = await axios.get(`${NEOXR_BASE_URL}/api/youtube`, {
+          params: {
+            url: youtubeUrlToDownload,
+            type: 'audio',
+            quality: '128kbps', // As per the screenshot
+            apikey: NEOXR_API_KEY
           }
-        } else {
-          throw new Error("Failed to fetch audio details or API error: " + (response.data ? JSON.stringify(response.data) : 'Unknown error'));
+        });
+
+        const json = neoxrResponse.data;
+
+        if (!json.status) {
+          // If Neoxr API returns an error status
+          return reply(`❌ Neoxr API Error: ${json.message || 'Unknown error occurred from API.'}`);
         }
-      };
 
-      reply("*⏳ Downloading your song... Please wait!*");
+        const audioData = json.data;
+        const audioUrl = audioData.url;
+        const audioTitle = json.title;
+        const audioSize = audioData.size; // e.g., "3.7 MB"
+        const audioFilename = audioData.filename; // e.g., "KOMANG - RAIM LAODE LYRIC OFFICIAL.mp3"
 
-      const audio = await downloadAudio(url);
+        // Optional: Implement size limit check if your bot has one.
+        // Example:
+        // const MAX_AUDIO_SIZE_MB = 50; // Set your limit
+        // const actualSizeMB = parseFloat(audioSize.replace('MB', '').trim());
+        // if (actualSizeMB > MAX_AUDIO_SIZE_MB) {
+        //   return reply(`⚠️ File size (${audioSize}) exceeds the maximum limit of ${MAX_AUDIO_SIZE_MB} MB.`);
+        // }
 
-      const cleanTitle = audio.title.replace(/[\\/:*?"<>|]/g, ""); // Remove invalid characters from filename
+        reply(`*✅ Audio details fetched! Size: ${audioSize}. Sending the audio file...*`);
 
-      await conn.sendMessage(
-        from,
-        {
-          audio: audio.buffer,
-          mimetype: "audio/mpeg",
-          fileName: `${cleanTitle}.mp3`,
-          ptt: false // Set to true if you want to send as voice message
-        },
-        { quoted: mek }
-      );
+        // Send the audio file using the direct URL from Neoxr API
+        // Most WhatsApp bot libraries (like Baileys) support sending documents/audio directly from a URL.
+        await conn.sendMessage(
+          from,
+          {
+            document: { url: audioUrl }, // Send as a document for better file management
+            mimetype: "audio/mpeg",
+            fileName: audioFilename, // Use the filename provided by the API
+            caption: `🎶 *${audioTitle}*\n\n_Size: ${audioSize}_\n\nMADE BY APEX-MD`
+          },
+          { quoted: mek }
+        );
 
-      await reply(`🎶 *${audio.title}*\n\nMADE BY APEX-MD`);
+      } catch (neoxrApiError) {
+        console.error("Error calling Neoxr API:", neoxrApiError);
+        // Handle specific Axios errors for better debugging
+        if (neoxrApiError.response) {
+          // The request was made and the server responded with a status code
+          // that falls out of the range of 2xx
+          reply(`❌ Neoxr API Request Failed: ${neoxrApiError.response.status} - ${neoxrApiError.response.statusText}. Data: ${JSON.stringify(neoxrApiError.response.data)}`);
+        } else if (neoxrApiError.request) {
+          // The request was made but no response was received
+          reply(`❌ Neoxr API No Response: Could not reach the API server. Check your internet connection or API server status.`);
+        } else {
+          // Something happened in setting up the request that triggered an Error
+          reply(`❌ Error setting up Neoxr API request: ${neoxrApiError.message}`);
+        }
+      }
 
     } catch (error) {
       console.error("Error in song command:", error);
