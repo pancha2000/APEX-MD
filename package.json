@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",
-    "@distube/ytdl-core": "^4.16.11",
     "@google/generative-ai": "0.24.1",
     "@whiskeysockets/baileys": "6.7.18",
     "axios": "^1.2.5",
