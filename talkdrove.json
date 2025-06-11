@@ -1,9 +1,9 @@
-{
+
   "bot-name": "APEX-MD",
   "description": "APEX-MD made for people on Earth",
   "logo": "https://i.postimg.cc/BbjVss8k/file-00000000d88461f7be4a5cc1864c4be5-1.png",
   "keywords": ["bot"],
-  "documentation-link": "https://session.talkdrove.com",
+  "documentation-link": "https://replit.com/@cdilrukshi52/Bot-qr",
   "owner-verification": "cdilrukshi52@gmail.com",
   "env": {
     "SESSION_ID": {
@@ -25,21 +25,5 @@
       "description": "OWNER_NUMBER with country code (e.g, 9230723xxxxx)",
       "value": "923072380xxxx",
       "required": true
-    },
-    "READ_CMD": {
-      "description": "Bot will read of msgs if it is enabled, To Enable put true and to disable put false (e.g, true)",
-      "value": "false",
-      "required": false
-    },
-    "AUTO_REACT": {
-      "description": "Bot will react to the msgs, To Enable put true and to disable put false (e.g, true)",
-      "value": "false",
-      "required": false
-    },
-    "ANTI_BAD": {
-      "description": "Bot delete the message from group if any bad word detected, To Enable put true and to disable put false (e.g, true)",
-      "value": "false",
-      "required": false
     }
   }
-}
