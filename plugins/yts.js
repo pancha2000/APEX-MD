@@ -1,10 +1,7 @@
+
 const { cmd } = require("../command");
 const yts = require("yt-search");
 const axios = require("axios");
-
-// ඔබේ Replit API Base URL එක මෙහි සඳහන් කරන්න
-// ඔබගේ API එකේ URL එක වෙනස් වුවහොත් මෙය update කරන්න.
-const MY_API_BASE_URL = "https://9e21112f-34b1-4091-9d80-f13e50bb380a-00-3a4vah9275xj5.sisko.replit.dev";
 
 cmd(
   {
@@ -23,14 +20,12 @@ cmd(
     try {
       if (!q) return reply("*🎶 Provide a song name or a YouTube link.*");
 
-      reply("⏳ *Searching for your song...*"); // Search status message
-
       const search = await yts(q);
-      const data = search.videos[0]; // පළමු වීඩියෝ ප්‍රතිඵලය
+      const data = search.videos[0];
 
       if (!data) return reply("❌ No song found for your query.");
 
-      const youtubeUrl = data.url; // YouTube වීඩියෝවේ URL එක
+      const url = data.url;
 
       // Song info message
       let desc = `🎶 *APEX-MD SONG DOWNLOADER* 🎶
@@ -50,42 +45,38 @@ MADE BY SHEHAN VIMUKYHI`;
         { quoted: mek }
       );
 
-      // ඔබේම API එකෙන් Audio URL එක ලබාගෙන එය Download කරන function එක
-      const getAndDownloadAudio = async (url, title) => {
-        const apiUrl = `${MY_API_BASE_URL}/audio?url=${encodeURIComponent(url)}`;
+      const downloadAudio = async (url) => {
+        const apiUrl = `https://p.oceansaver.in/ajax/download.php?format=mp3&url=${encodeURIComponent(
+          url
+        )}&api=dfcb6d76f2f6a9894gjkege8a4ab232222`;
 
-        try {
-          const response = await axios.get(apiUrl);
+        const response = await axios.get(apiUrl);
 
-          if (response.data && response.data.audio_url) {
-            const directAudioUrl = response.data.audio_url;
+        if (response.data && response.data.success) {
+          const { id, title } = response.data;
+          const progressUrl = `https://p.oceansaver.in/ajax/progress.php?id=${id}`;
 
-            // Direct Audio URL එකෙන් Audio Buffer එක Download කරන්න
-            const audioBufferResponse = await axios.get(directAudioUrl, {
-              responseType: "arraybuffer", // Buffer එකක් ලෙස ලබා ගැනීමට
-            });
-
-            // Buffer එක සහ Title එක ආපසු දෙන්න
-            return { buffer: audioBufferResponse.data, title };
-          } else {
-            // ඔබේ API එකෙන් error එකක් ආවොත් එය handle කරන්න
-            throw new Error(response.data.error || "Failed to retrieve direct audio URL from your API. Check API logs for details.");
+          while (true) {
+            const progress = await axios.get(progressUrl);
+            if (progress.data.success && progress.data.progress === 1000) {
+              const audioBuffer = await axios.get(
+                progress.data.download_url,
+                {
+                  responseType: "arraybuffer",
+                }
+              );
+              return { buffer: audioBuffer.data, title };
+            }
+            await new Promise((resolve) => setTimeout(resolve, 2000));
           }
-        } catch (apiError) {
-          // Axios request එකේ හෝ API response එකේ ගැටලුවක්
-          console.error("Error calling your API or downloading audio from direct URL:", apiError.message);
-          if (apiError.response && apiError.response.data && apiError.response.data.details) {
-              throw new Error(`API Error: ${apiError.response.data.error || "Unknown"}. Details: ${apiError.response.data.details}`);
-          }
-          throw apiError; // නැවතත් error එක throw කරන්න
+        } else {
+          throw new Error("Failed to fetch audio details or API error.");
         }
       };
 
       reply("*⏳ Downloading your song... Please wait!*");
 
-      // ඔබේ API එකෙන් audio URL එක ලබාගෙන download කරන්න
-      // data.title යනු yts (yt-search) මගින් ලැබෙන title එකයි.
-      const audio = await getAndDownloadAudio(youtubeUrl, data.title);
+      const audio = await downloadAudio(url);
 
       const cleanTitle = audio.title.replace(/[\\/:*?"<>|]/g, "");
 
@@ -93,7 +84,7 @@ MADE BY SHEHAN VIMUKYHI`;
         from,
         {
           audio: audio.buffer,
-          mimetype: "audio/mpeg", // MP3 සඳහා mimetype
+          mimetype: "audio/mpeg",
           fileName: `${cleanTitle}.mp3`,
         },
         { quoted: mek }
@@ -102,8 +93,8 @@ MADE BY SHEHAN VIMUKYHI`;
       await reply(`🎶 *${audio.title}*\n\nMADE BY APEX-MD`);
 
     } catch (error) {
-      console.error("Error in song command:", error);
-      reply(`❌ Error downloading song. Please try again later. Details: ${error.message}`);
+      console.error(error);
+      reply("❌ Error downloading song. Please try again later.");
     }
   }
 );
