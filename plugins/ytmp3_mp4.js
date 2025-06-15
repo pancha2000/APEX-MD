@@ -98,7 +98,7 @@ async function youtubeDownloadHandler(conn, mek, m, { from, quoted, body, isCmd,
         desc += `🗓️ *Uploaded* : ${videoInfo.ago}\n`;
         desc += `📺 *Channel* : ${videoInfo.author.name}\n`;
         desc += `🔗 *Link* : ${videoInfo.url}\n\n`;
-        desc += `_Powered by APEX-MD\n\n`;
+        desc += `Powered by APEX-MD\n\n`;
         desc += '.ytmp command එක වැඩ නැතිනම් අනෙක් download command උත්සහ කරන්න' // ඔබට කැමති නමක් දමන්න
 
         await conn.sendMessage(
