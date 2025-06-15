@@ -38,7 +38,7 @@ cmd(
 👻 *Link* : ${data.url}
 
 MADE BY SHEHAN VIMUKYHI
-.ytmp command එක වැඩ නැතිනම් අනෙක් download command උත්සහ කරන්න'
+.song command එක වැඩ නැතිනම් අනෙක් download command උත්සහ කරන්න'
 `;
 
 
