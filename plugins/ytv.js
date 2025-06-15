@@ -1,3 +1,5 @@
+--- START OF FILE yst.js ---
+
 // plugins/youtube.js
 // මෙම මොඩියුලය WhatsApp Bot හි YouTube Download Commands හැසිරවීමට භාවිතා වේ.
 
@@ -23,7 +25,7 @@ const YOUTUBE_DOWNLOAD_API_URL = 'https://electoral-glad-h79160251-fbc6ed34.koye
 
 // !audio command එක define කිරීම
 cmd({
-    pattern: "audio", // command එකේ pattern එක. ඔබගේ බොට්ගේ prefix එක (e.g., '!') මෙහි අවශ්‍ය නැහැ.
+    pattern: "song", // command එකේ pattern එක. ඔබගේ බොට්ගේ prefix එක (e.g., '!') මෙහි අවශ්‍ය නැහැ.
     cmdname: "audio",
     react: "🎵", // ඔබට අවශ්‍ය නම් reaction එකක් දමන්න
     desc: "Download YouTube Audio.",
@@ -87,6 +89,7 @@ async function youtubeDownloadHandler(conn, mek, m, { from, quoted, body, isCmd,
     }
 
     // වීඩියෝ තොරතුරු සමග thumbnail එකක් යවන්න (ඔබේ කලින් 'video' command එකේ වගේ)
+    // මේ කොටස එලෙසම තබමු, එය user ට හොඳ අත්දැකීමක් ලබා දෙනවා.
     if (videoInfo && videoInfo.thumbnail) {
         let desc = `🎬 *YouTube ${type.toUpperCase()} Downloader* 🎬\n\n`;
         desc += `✨ *Title* : ${videoInfo.title}\n`;
@@ -95,7 +98,7 @@ async function youtubeDownloadHandler(conn, mek, m, { from, quoted, body, isCmd,
         desc += `🗓️ *Uploaded* : ${videoInfo.ago}\n`;
         desc += `📺 *Channel* : ${videoInfo.author.name}\n`;
         desc += `🔗 *Link* : ${videoInfo.url}\n\n`;
-        desc += `_Powered by Your API_`; // ඔබට කැමති නමක් දමන්න
+        desc += `_Powered by APEX-MD`; // ඔබට කැමති නමක් දමන්න
 
         await conn.sendMessage(
             from,
@@ -116,7 +119,46 @@ async function youtubeDownloadHandler(conn, mek, m, { from, quoted, body, isCmd,
 
         if (response.status === 200 && (response.data.audio_url || response.data.video_url)) {
             const downloadUrl = response.data.audio_url || response.data.video_url;
-            await reply(`🔗 Here is your direct download link for ${type}: \n${downloadUrl}`);
+
+            // ***** මෙතනින් පහලට තමයි ප්‍රධාන වෙනස සිදු කරන්නේ *****
+            // API එකෙන් ලැබුණු download URL එකෙන් media file එක download කරගැනීම
+            await reply(`⏳ Please wait while I download and send your ${type}...\n_This may take some time depending on the file size._`);
+
+            try {
+                const mediaResponse = await axios.get(downloadUrl, { responseType: 'arraybuffer' }); // media data එක binary buffer එකක් ලෙස ලබා ගැනීම
+                const mediaBuffer = Buffer.from(mediaResponse.data); // Buffer එකක් බවට පත් කිරීම
+
+                let messageOptions = { quoted: mek }; // WhatsApp message options
+
+                if (type === 'audio') {
+                    // Audio ලෙස යැවීම
+                    // "mimetype" එක නිවැරදිදැයි තහවුරු කරගන්න. mp3 සඳහා 'audio/mpeg' සාමාන්‍යයෙන් භාවිතා වේ.
+                    messageOptions.audio = mediaBuffer;
+                    messageOptions.mimetype = 'audio/mpeg';
+                    messageOptions.fileName = `${videoInfo ? videoInfo.title : 'audio'}.mp3`; // File name එකක් දෙන්න
+                    // `ptt: true` යෙදුවොත් voice note එකක් ලෙස යයි. අවශ්‍ය නම් ඉවත් කරන්න.
+                    messageOptions.ptt = true; // Voice note ලෙස යැවීම
+                } else if (type === 'video') {
+                    // Video ලෙස යැවීම
+                    // "mimetype" එක නිවැරදිදැයි තහවුරු කරගන්න. mp4 සඳහා 'video/mp4' සාමාන්‍යයෙන් භාවිතා වේ.
+                    messageOptions.video = mediaBuffer;
+                    messageOptions.mimetype = 'video/mp4';
+                    messageOptions.caption = videoInfo ? `🎥 ${videoInfo.title}` : `🎥 YouTube Video`; // Video එකට caption එකක් දෙන්න
+                    messageOptions.fileName = `${videoInfo ? videoInfo.title : 'video'}.mp4`; // File name එකක් දෙන්න
+                }
+                
+                // WhatsApp සීමාවන් නිසා විශාල files යැවීමට නොහැකි වුවහොත්, link එකක් යවන්න.
+                // මේ කොටස උත්සාහ කරන්න, සාර්ථක නොවුවහොත්, පහත link එක යැවීමට වැටේ.
+                await conn.sendMessage(from, messageOptions);
+                await reply(`✅ Your ${type} has been sent successfully!`);
+
+            } catch (downloadError) {
+                console.error(`Error downloading media from ${downloadUrl} or sending to WhatsApp:`, downloadError.message);
+                // WhatsApp file size limit එකක් නිසා හෝ වෙනත් ගැටලුවක් නිසා download කර යැවීමට නොහැකි නම්, link එක යවන්න.
+                await reply(`❌ An error occurred while sending the ${type} directly (It might be too large for WhatsApp or a temporary issue).\nHere is the direct download link instead: \n${downloadUrl}`);
+            }
+            // ***** මෙතැනින් ඉහලට තමයි ප්‍රධාන වෙනස *****
+
         } else {
             await reply(`❌ Could not get ${type} link. API responded with an unexpected error.`);
             console.error('API Error Response:', response.data);
