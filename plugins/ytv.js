@@ -32,7 +32,7 @@ cmd(
 
 Powered by APEX-MD
 
-.ytmp command එක වැඩ නැතිනම් අනෙක් download command උත්සහ කරන්න
+.video command එක වැඩ නැතිනම් අනෙක් download command උත්සහ කරන්න
 `;
 
       await conn.sendMessage(
