@@ -37,9 +37,9 @@ cmd(
 👻 *Channel* : ${data.author.name}
 👻 *Link* : ${data.url}
 
-Powered by APEX-MD
-
-.ytmp command එක වැඩ නැතිනම් අනෙක් download command උත්සහ කරන්න';
+MADE BY SHEHAN VIMUKYHI
+.ytmp command එක වැඩ නැතිනම් අනෙක් download command උත්සහ කරන්න'
+`;
 
 
       await conn.sendMessage(
