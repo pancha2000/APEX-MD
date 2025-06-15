@@ -25,7 +25,7 @@ const YOUTUBE_DOWNLOAD_API_URL = 'https://electoral-glad-h79160251-fbc6ed34.koye
 
 // !audio command එක define කිරීම
 cmd({
-    pattern: "song", // command එකේ pattern එක. ඔබගේ බොට්ගේ prefix එක (e.g., '!') මෙහි අවශ්‍ය නැහැ.
+    pattern: "ytmp3", // command එකේ pattern එක. ඔබගේ බොට්ගේ prefix එක (e.g., '!') මෙහි අවශ්‍ය නැහැ.
     cmdname: "audio",
     react: "🎵", // ඔබට අවශ්‍ය නම් reaction එකක් දමන්න
     desc: "Download YouTube Audio.",
@@ -40,7 +40,7 @@ cmd({
 
 // !video command එක define කිරීම
 cmd({
-    pattern: "video",
+    pattern: "ytmp4",
     cmdname: "video",
     react: "🎥", // ඔබට අවශ්‍ය නම් reaction එකක් දමන්න
     desc: "Download YouTube Video.",
@@ -98,7 +98,8 @@ async function youtubeDownloadHandler(conn, mek, m, { from, quoted, body, isCmd,
         desc += `🗓️ *Uploaded* : ${videoInfo.ago}\n`;
         desc += `📺 *Channel* : ${videoInfo.author.name}\n`;
         desc += `🔗 *Link* : ${videoInfo.url}\n\n`;
-        desc += `_Powered by APEX-MD`; // ඔබට කැමති නමක් දමන්න
+        desc += `_Powered by APEX-MD\n\n`;
+        desc += '.ytmp command එක වැඩ නැතිනම් අනෙක් download command උත්සහ කරන්න' // ඔබට කැමති නමක් දමන්න
 
         await conn.sendMessage(
             from,
