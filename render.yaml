@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: apex-md-bot
+    env: node
+    buildCommand: npm install
+    startCommand: node index.js
+    plan: free
+    envVars:
+      - key: SESSION_STRING
+        value: "<ඔයාගේ-Session-String>"
+      - key: MONGO_URI
+        value: "<ඔයාගේ-MongoDB-URI>"
+      - key: BOT_MODE
+        value: "public"
