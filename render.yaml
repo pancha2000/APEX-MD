@@ -7,8 +7,8 @@ services:
     plan: free
     envVars:
       - key: SESSION_STRING
-        value: "<ඔයාගේ-Session-String>"
+        value: "PRlQWQCC#kbL4tob-unW5vicqtShvwBJMX_sq6g00FHwkgT2LCdg"
       - key: MONGO_URI
-        value: "<ඔයාගේ-MongoDB-URI>"
+        value: "mongodb+srv://pancha:2006.Shehan@cluster0.hyugfei.mongodb.net/"
       - key: BOT_MODE
         value: "public"
