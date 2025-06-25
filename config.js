@@ -14,11 +14,11 @@ module.exports = {
     
 // ==================Your info=================================
 
-  OWNER_NAME: "Shehan Vimukthi",
-  PUBLIC_NAME: "Real Pancha",
-  NICKNAME: "Pancha",
-  AGE: "19",
-  OWNER_CONTACT: "wa.me/+94701391585",
+  OWNER_NAME: process.env.OWNER_NAME || "Shehan Vimukthi",
+  PUBLIC_NAME: process.env.PUBLIC_NAME || "Real Pancha",
+  NICKNAME: process.env.NICKNAME || "Pancha",
+  AGE: process.env.AGE || "19",
+  OWNER_CONTACT: process.env.OWNER_CONTACT || "wa.me/+94701391585",
   
 
 };
