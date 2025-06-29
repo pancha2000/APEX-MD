@@ -9,7 +9,7 @@ const axios = require('axios'); // axios npm package එක ස්ථාපන�
 
 // ඔබගේ Koyeb API URL එක මෙහි සඳහන් කරන්න.
 // config.js වෙතින් ලබා ගැනීමට අවශ්‍ය නම්, පහත commented line එක භාවිතා කරන්න.
-const YOUTUBE_DOWNLOAD_API_URL = 'https://electoral-glad-h79160251-fbc6ed34.koyeb.app';
+const YOUTUBE_DOWNLOAD_API_URL = 'https://youtube-download-api-gold.vercel.app/'; //'https://electoral-glad-h79160251-fbc6ed34.koyeb.app';
 
 // -----------------------------------------------------------------------------
 // විකල්පය: API URL එක config.js වෙතින් ලබා ගැනීම (වඩාත් හොඳ පුරුද්දක්)
