@@ -44,12 +44,10 @@ async function connectToWA() {
     const { version } = await fetchLatestBaileysVersion();
 
     const conn = makeWASocket({
-        // 1. Logger එක 'info' කළා. දැන් එරර් ආවොත් පෙනෙයි.
-        logger: P({ level: 'info' }), 
+        logger: P({ level: 'silent' }), // ලොග් එක පිරෙන එක නවත්තන්න silent කළා
         printQRInTerminal: true,
         browser: Browsers.ubuntu("Chrome"),
-        // 2. මෙන්න මේක false කළාම 'Reply Once' ලෙඩේ ෂුවර් එකටම හරියනවා
-        syncFullHistory: false, 
+        syncFullHistory: false, // ඉතිහාසය ලෝඩ් කිරීම නැවැත්තුවා
         auth: state,
         version: version, 
         generateHighQualityLinkPreview: true,
@@ -109,6 +107,9 @@ async function connectToWA() {
     conn.ev.on('messages.upsert', async (mekEvent) => {
         const mek = mekEvent.messages[0];
         if (!mek.message || mek.key.remoteJid === 'status@broadcast') return;
+        
+        // ⚠️ @lid මැසේජ් වලින් එන Error නවත්වන්න මේ කොටස දැම්මා
+        if (mek.key.remoteJid.includes('@lid')) return;
 
         const m = sms(conn, mek);
         if (!m || !m.type) return;
@@ -264,4 +265,13 @@ app.get("/", (req, res) => {
 app.listen(port, () => {
     console.log(`Server listening on port http://localhost:${port}`);
     startBot();
+});
+
+// --- ANTI-CRASH HANDLERS ---
+process.on('uncaughtException', function (err) {
+    console.log('Caught exception: ', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.log('Unhandled Rejection at:', promise, 'reason:', reason);
 });
