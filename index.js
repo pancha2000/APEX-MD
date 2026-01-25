@@ -1,23 +1,3 @@
-// ================================================================
-// 🛑 ERROR HIDER (වද දෙන Error හංගන කොටස - මේක උඩින්ම තියෙන්න ඕනේ)
-// ================================================================
-const originalConsoleError = console.error;
-const originalConsoleLog = console.log;
-
-console.error = function (msg, ...args) {
-    const str = String(msg || '');
-    // මේ වචන තියෙන Error එළියට පෙන්නන්න එපා
-    if (str.includes('Bad MAC') || str.includes('Session error') || str.includes('Decrypt') || str.includes('Closing session') || str.includes('Stream Errored')) return;
-    originalConsoleError.apply(console, [msg, ...args]);
-};
-
-console.log = function (msg, ...args) {
-    const str = String(msg || '');
-    if (str.includes('Bad MAC') || str.includes('Session error') || str.includes('Decrypt') || str.includes('Closing session') || str.includes('Stream Errored')) return;
-    originalConsoleLog.apply(console, [msg, ...args]);
-};
-// ================================================================
-
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -55,7 +35,7 @@ async function connectToWA() {
         prefix = botSettings.PREFIX || ".";
         console.log("Bot settings loaded. Prefix:", prefix, "Mode:", botSettings.MODE);
     } catch (error) {
-        console.warn("Could not load settings from DB.", error.message);
+        console.log("Settings Load Error:", error.message);
     }
 
     console.log("Connecting APEX-MD Wa-BOT 🧬...");
@@ -63,22 +43,18 @@ async function connectToWA() {
     const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/');
     const { version } = await fetchLatestBaileysVersion();
 
-    // Pino Logger Filter එක (මේකත් තියෙන්න දින්න)
-    const logFilter = {
-        write: (msg) => {
-            if (msg.includes('Bad MAC') || msg.includes('No session') || msg.includes('decrypt') || msg.includes('Stream Errored')) return;
-            process.stdout.write(msg);
-        }
-    };
-
     const conn = makeWASocket({
-        logger: P({ level: 'error' }, logFilter),
+        // මෙතන 'silent' දාමු, එතකොට අර ලොකු JSON කෑලි එන්නේ නෑ. හැබැයි අනිත් ඒවා පේනවා.
+        logger: P({ level: 'silent' }), 
         printQRInTerminal: true,
         browser: Browsers.ubuntu("Chrome"),
-        syncFullHistory: false, 
+        syncFullHistory: false, // ඉතිහාසය ලෝඩ් නොකරන නිසා බොට් වේගවත්
         auth: state,
-        version: version, 
+        version: version,
         generateHighQualityLinkPreview: true,
+        connectTimeoutMs: 60000, 
+        keepAliveIntervalMs: 10000, 
+        retryRequestDelayMs: 2000 
     });
 
     conn.ev.on('connection.update', (update) => {
@@ -96,11 +72,13 @@ async function connectToWA() {
                                      statusCode !== DisconnectReason.connectionLost &&
                                      statusCode !== DisconnectReason.timedOut);
 
-            console.log('Connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
+            // Log එකේ පෙන්නමු ඇයි කැඩුනේ කියලා (හංගන්නේ නෑ)
+            console.log('Connection closed:', lastDisconnect.error?.message || statusCode);
 
             if (statusCode === DisconnectReason.loggedOut) {
                 console.log('Logged out. Please delete Session and restart.');
             } else if (shouldReconnect) {
+                console.log('Reconnecting...');
                 connectToWA();
             }
         } else if (connection === 'open') {
@@ -125,7 +103,7 @@ async function connectToWA() {
                 conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
                     image: { url: botSettings.ALIVE_IMG },
                     caption: up
-                }).catch(e => console.error("Error sending welcome:", e));
+                }).catch(e => {});
             }
         }
     });
@@ -136,8 +114,8 @@ async function connectToWA() {
         const mek = mekEvent.messages[0];
         if (!mek.message || mek.key.remoteJid === 'status@broadcast') return;
         
-        // ⚠️ @lid මැසේජ් වලින් එන Error නවත්වන්න මේ කොටස දැම්මා
-        if (mek.key.remoteJid.includes('@lid')) return;
+        // System messages අයින් කරමු
+        if (mek.key.remoteJid.includes('@lid') || mek.message.protocolMessage) return;
 
         const m = sms(conn, mek);
         if (!m || !m.type) return;
@@ -219,32 +197,15 @@ async function connectToWA() {
             if (cmdObj) {
                 if (cmdObj.react) conn.sendMessage(from, { react: { text: cmdObj.react, key: mek.key } });
                 try {
-                    // Command එක Run කරනවා
                     await cmdObj.function(conn, mek, m, { from, quoted, body, isCmd, command: cmdName, cmdObject: cmdObj, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply });
                 } catch (e) {
-                    // 2. Error System එක: ලෙඩේ කෙලින්ම Owner ට කියන කොටස
                     console.error(`[PLUGIN ERROR] ${cmdName}:`, e);
-                    
-                    // User ට පොඩි මැසේජ් එකක්
-                    reply("❌ අම්මටසිරි පොඩි අවුලක් ගියා. මම මේක Owner ට දැන්ම කිව්වා.");
-
-                    // Owner ට සම්පූර්ණ Report එකක්
+                    // මෙතන අර Owner Report කෑල්ල තියෙනවා
                     const errorReport = `
 🚨 *APEX-MD ERROR REPORT* 🚨
-
 🤖 *Command:* ${cmdName}
-👤 *User:* ${pushname} (${senderNumber})
-💬 *Chat:* ${isGroup ? groupName : 'Private Chat'}
-📄 *Error:* \`\`\`${e.message}\`\`\`
-stacks: \`\`\`${e.stack}\`\`\`
-`;
-                    // Owner ගේ නම්බර් එකට යවනවා
-                    await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { 
-                        text: errorReport,
-                        contextInfo: {
-                            mentionedJid: [sender]
-                        }
-                    });
+📄 *Error:* ${e.message}`;
+                    await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { text: errorReport });
                 }
             }
         } else if (body) {
@@ -262,7 +223,7 @@ stacks: \`\`\`${e.stack}\`\`\`
                             cmdObject.function(conn, mek, m, commonParams);
                         }
                     } catch (e) {
-                         console.error(`[EVENT PLUGIN ERROR][on:${cmdObject.on}]`, e);
+                         // Silent fail for event errors
                     }
                 }
             });
@@ -280,7 +241,7 @@ async function startBot() {
 
     if (fs.existsSync(authPath)) {
         console.log("Session file found. Connecting...");
-        connectToWA().catch(err => console.error("Connection Error:", err));
+        connectToWA().catch(err => console.log("Connection Fail"));
     } else if (appConfig.SESSION_ID) {
         console.log("Downloading session from SESSION_ID...");
         const sessdata = appConfig.SESSION_ID.trim();
@@ -318,7 +279,7 @@ app.listen(port, () => {
     startBot();
 });
 
-// --- ANTI-CRASH HANDLERS ---
+// Anti-Crash (බොට් මැරෙන්න නොදී තියාගන්න කෑල්ල)
 process.on('uncaughtException', function (err) {
     console.log('Caught exception: ', err);
 });
