@@ -16,19 +16,17 @@ const { sms } = require('./lib/msg');
 const axios = require('axios');
 const { File } = require('megajs');
 const path = require('path');
-const { getBotSettings, readEnv, connectDB } = require('./lib/mongodb'); // updateEnv අවශ්‍ය නැති නිසා අයින් කළා
+const { getBotSettings, readEnv, connectDB } = require('./lib/mongodb');
 
 const ownerNumber = ['94701391585']; // ඔයාගේ නම්බර් එක
 const express = require("express");
 const app = express();
 const port = process.env.PORT || 8000;
 
-// ගෝලීය විචල්‍යයන්
 let botSettings = getBotSettings();
 let prefix = botSettings.PREFIX;
 
 async function connectToWA() {
-    // 1. Database සම්බන්ධ කිරීම
     await connectDB();
 
     try {
@@ -42,16 +40,13 @@ async function connectToWA() {
 
     console.log("Connecting APEX-MD Wa-BOT 🧬...");
 
-    // 2. Auth සහ Version
     const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/');
     const { version } = await fetchLatestBaileysVersion();
 
-    // 3. Socket එක සෑදීම
     const conn = makeWASocket({
         logger: P({ level: 'silent' }),
         printQRInTerminal: true,
-        // Ubuntu Browser එක දැමීමෙන් 405 Error වලක්වයි
-        browser: Browsers.ubuntu("Chrome"),
+        browser: Browsers.ubuntu("Chrome"), // 405 Error වලක්වයි
         syncFullHistory: true,
         auth: state,
         version: version, 
