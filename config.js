@@ -8,7 +8,7 @@ if (fs.existsSync('config.env')) {
 
 module.exports = {
   //===================Bot info===============================
-    SESSION_ID: process.env.SESSION_ID || "H7h3CCTT#ixyzTHRdJTVT7zYcD4Vfr9masBu_zXEtBKf6irkXPT8",
+    SESSION_ID: process.env.SESSION_ID || "Oyw20bJQ#bzEKygUca2Dcz7Avx32ch-ZoVzbzvcSGZAtNRDrLwlU",
     MONGODB: process.env.MONGODB || "mongodb+srv://realpancha:2006.Shehan@cluster0.uuquagy.mongodb.net//",
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || "AIzaSyCItRq9qKhyDo5ZjO_ZBtRC1Z-Y3UD9Ma0",
     
