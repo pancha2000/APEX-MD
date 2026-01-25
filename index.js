@@ -3,7 +3,6 @@ const {
     useMultiFileAuthState,
     DisconnectReason,
     jidNormalizedUser,
-    getContentType,
     fetchLatestBaileysVersion,
     Browsers
 } = require('@whiskeysockets/baileys');
@@ -17,20 +16,17 @@ const { sms } = require('./lib/msg');
 const axios = require('axios');
 const { File } = require('megajs');
 const path = require('path');
-const { getBotSettings, readEnv, updateEnv, connectDB } = require('./lib/mongodb');
+const { getBotSettings, readEnv, connectDB } = require('./lib/mongodb'); // updateEnv අවශ්‍ය නැති නිසා අයින් කළා
 
-// ඔයාගේ නම්බර් එක (Owner)
-const ownerNumber = ['94701391585'];
-
+const ownerNumber = ['94701391585']; // ඔයාගේ නම්බර් එක
 const express = require("express");
 const app = express();
 const port = process.env.PORT || 8000;
 
-// ගෝලීය විචල්‍යයන් (Global Variables)
+// ගෝලීය විචල්‍යයන්
 let botSettings = getBotSettings();
 let prefix = botSettings.PREFIX;
 
-// --- ප්‍රධාන සම්බන්ධතා ෆන්ක්ෂන් එක ---
 async function connectToWA() {
     // 1. Database සම්බන්ධ කිරීම
     await connectDB();
@@ -39,14 +35,14 @@ async function connectToWA() {
         await readEnv();
         botSettings = getBotSettings();
         prefix = botSettings.PREFIX || ".";
-        console.log("Bot settings loaded from DB. Prefix:", prefix, "Mode:", botSettings.MODE);
+        console.log("Bot settings loaded. Prefix:", prefix, "Mode:", botSettings.MODE);
     } catch (error) {
         console.warn("Could not load settings from DB.", error.message);
     }
 
     console.log("Connecting APEX-MD Wa-BOT 🧬...");
 
-    // 2. Auth State සහ Version ලබා ගැනීම
+    // 2. Auth සහ Version
     const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/');
     const { version } = await fetchLatestBaileysVersion();
 
@@ -54,15 +50,14 @@ async function connectToWA() {
     const conn = makeWASocket({
         logger: P({ level: 'silent' }),
         printQRInTerminal: true,
-        // Browser එක Ubuntu ලෙස දැමීමෙන් 405 Error එක විසඳේ
+        // Ubuntu Browser එක දැමීමෙන් 405 Error වලක්වයි
         browser: Browsers.ubuntu("Chrome"),
         syncFullHistory: true,
         auth: state,
-        version: version, // Version එක අනිවාර්යයි
+        version: version, 
         generateHighQualityLinkPreview: true,
     });
 
-    // 4. Connection Updates හැසිරවීම
     conn.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         
@@ -81,7 +76,7 @@ async function connectToWA() {
             console.log('Connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
 
             if (statusCode === DisconnectReason.loggedOut) {
-                console.log('Connection logged out, please delete auth_info_baileys and restart.');
+                console.log('Logged out. Please delete Session and restart.');
             } else if (shouldReconnect) {
                 connectToWA();
             }
@@ -99,26 +94,21 @@ async function connectToWA() {
                     }
                 });
                 console.log('APEX-MD Plugins installed successful ✅');
-            } else {
-                console.warn("Plugins directory not found. No plugins loaded.");
             }
-
             console.log('APEX-MD connected to WhatsApp ✅');
 
-            if (ownerNumber && ownerNumber.length > 0) {
+            if (ownerNumber.length > 0) {
                 let up = `APEX-MD connected successful ✅\n\nPREFIX: ${prefix}`;
                 conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-                    image: { url: botSettings.ALIVE_IMG || `https://imgur.com/a/JVLUBdD` },
+                    image: { url: botSettings.ALIVE_IMG },
                     caption: up
                 }).catch(e => console.error("Error sending welcome:", e));
             }
         }
     });
 
-    // 5. Creds Save කිරීම (මේක නැතුව තමයි එක පාරයි රිප්ලයි කළේ)
     conn.ev.on('creds.update', saveCreds);
 
-    // 6. Messages Upsert (මැසේජ් එන තැන)
     conn.ev.on('messages.upsert', async (mekEvent) => {
         const mek = mekEvent.messages[0];
         if (!mek.message || mek.key.remoteJid === 'status@broadcast') return;
@@ -126,7 +116,6 @@ async function connectToWA() {
         const m = sms(conn, mek);
         if (!m || !m.type) return;
 
-        // Settings Update on every message
         botSettings = getBotSettings();
         prefix = botSettings.PREFIX || ".";
 
@@ -159,17 +148,14 @@ async function connectToWA() {
 
         const reply = (teks, chatId = from, options = {}) => m.reply(teks, chatId, options);
 
-        // File Send Function
         conn.sendFileUrl = async (jid, url, caption, quotedMsg, options = {}) => {
             let mime = '';
             try {
                 const headRes = await axios.head(url, { timeout: 5000 });
                 mime = headRes.headers['content-type'];
                 if (!mime) throw new Error("Could not determine MIME type");
-
                 const buffer = await getBuffer(url);
                 if (!buffer) throw new Error("Failed to download file buffer");
-
                 const fileNameFromUrl = path.basename(new URL(url).pathname);
 
                 if (mime.split("/")[0] === "image" && mime.split("/")[1] === "gif") {
@@ -188,20 +174,17 @@ async function connectToWA() {
                     return conn.sendMessage(jid, { audio: buffer, mimetype: mime, ...options }, { quoted: quotedMsg });
                 }
                 return conn.sendMessage(jid, { document: buffer, mimetype: mime, caption: caption, fileName: fileNameFromUrl || "file" + path.extname(url), ...options }, { quoted: quotedMsg });
-
             } catch (error) {
                 console.error("Error in sendFileUrl:", error);
                 reply(`Error sending file: ${error.message}`, from);
             }
         };
 
-        // Work Mode Logic
         const currentWorkMode = botSettings.MODE ? botSettings.MODE.toLowerCase() : 'public';
         if (currentWorkMode === 'private' && !isOwner) return;
         if (currentWorkMode === 'inbox' && !isOwner && isGroup) return;
         if (currentWorkMode === 'groups' && !isGroup && !isOwner) return;
 
-        // Command Handling
         const events = require('./command');
         const cmdName = command;
 
@@ -238,18 +221,16 @@ async function connectToWA() {
     });
 }
 
-// --- බොට් ආරම්භ කිරීම ---
 async function startBot() {
     const authPath = path.join(__dirname, 'auth_info_baileys', 'creds.json');
     const authDir = path.join(__dirname, 'auth_info_baileys');
 
-    // Folder එක නැත්නම් හදනවා
     if (!fs.existsSync(authDir)) {
         fs.mkdirSync(authDir, { recursive: true });
     }
 
     if (fs.existsSync(authPath)) {
-        console.log("Session file found. Connecting to WhatsApp...");
+        console.log("Session file found. Connecting...");
         connectToWA().catch(err => console.error("Connection Error:", err));
     } else if (appConfig.SESSION_ID) {
         console.log("Downloading session from SESSION_ID...");
