@@ -4,6 +4,7 @@ const {
     DisconnectReason,
     jidNormalizedUser,
     getContentType,
+    fetchLatestBaileysVersion,
     Browsers
 } = require('@whiskeysockets/baileys');
 
@@ -12,65 +13,73 @@ const fs = require('fs');
 const P = require('pino');
 const appConfig = require('./config');
 const qrcode = require('qrcode-terminal');
-const { sms } = require('./lib/msg'); 
+const { sms } = require('./lib/msg');
 const axios = require('axios');
 const { File } = require('megajs');
 const path = require('path');
 const { getBotSettings, readEnv, updateEnv, connectDB } = require('./lib/mongodb');
 
-const ownerNumber = ['94701391585']; // ඔයාගේ නම්බර් එක
+// ඔයාගේ නම්බර් එක (Owner)
+const ownerNumber = ['94701391585'];
 
 const express = require("express");
 const app = express();
 const port = process.env.PORT || 8000;
 
-// ආරම්භක අගයන්
+// ගෝලීය විචල්‍යයන් (Global Variables)
 let botSettings = getBotSettings();
 let prefix = botSettings.PREFIX;
 
+// --- ප්‍රධාන සම්බන්ධතා ෆන්ක්ෂන් එක ---
 async function connectToWA() {
-    await connectDB(); // DB සම්බන්ධ කරන්න
+    // 1. Database සම්බන්ධ කිරීම
+    await connectDB();
 
     try {
-        await readEnv(); 
-        botSettings = getBotSettings(); 
-        prefix = botSettings.PREFIX || "."; 
+        await readEnv();
+        botSettings = getBotSettings();
+        prefix = botSettings.PREFIX || ".";
         console.log("Bot settings loaded from DB. Prefix:", prefix, "Mode:", botSettings.MODE);
     } catch (error) {
-        console.warn("Could not load settings from DB. Using default/hardcoded settings.", error.message);
+        console.warn("Could not load settings from DB.", error.message);
     }
 
     console.log("Connecting APEX-MD Wa-BOT 🧬...");
-    const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/');
-    
-    // ⚠️ වැදගත් වෙනස්කම: මෙතන තිබුන 'fetchLatestBaileysVersion' අයින් කළා.
-    // එය තිබුනොත් Session එක කැඩෙනවා. දැන් ගන්නේ කෙලින්ම install කරපු version එකයි.
 
+    // 2. Auth State සහ Version ලබා ගැනීම
+    const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/');
+    const { version } = await fetchLatestBaileysVersion();
+
+    // 3. Socket එක සෑදීම
     const conn = makeWASocket({
         logger: P({ level: 'silent' }),
         printQRInTerminal: true,
-        browser: Browsers.macOS("Firefox"),
+        // Browser එක Ubuntu ලෙස දැමීමෙන් 405 Error එක විසඳේ
+        browser: Browsers.ubuntu("Chrome"),
         syncFullHistory: true,
         auth: state,
-        // version: version <-- මෙය අයින් කරන ලදී
+        version: version, // Version එක අනිවාර්යයි
         generateHighQualityLinkPreview: true,
     });
 
+    // 4. Connection Updates හැසිරවීම
     conn.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
+        
         if (qr && !conn.authState.creds.registered) {
             console.log('Scan QR code to connect:');
             qrcode.generate(qr, { small: true });
         }
+
         if (connection === 'close') {
             const statusCode = lastDisconnect.error?.output?.statusCode;
             const shouldReconnect = (statusCode !== DisconnectReason.loggedOut &&
-                                     statusCode !== DisconnectReason.connectionClosed && 
-                                     statusCode !== DisconnectReason.connectionLost && 
-                                     statusCode !== DisconnectReason.timedOut); 
+                                     statusCode !== DisconnectReason.connectionClosed &&
+                                     statusCode !== DisconnectReason.connectionLost &&
+                                     statusCode !== DisconnectReason.timedOut);
 
             console.log('Connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
-            
+
             if (statusCode === DisconnectReason.loggedOut) {
                 console.log('Connection logged out, please delete auth_info_baileys and restart.');
             } else if (shouldReconnect) {
@@ -93,22 +102,23 @@ async function connectToWA() {
             } else {
                 console.warn("Plugins directory not found. No plugins loaded.");
             }
-            
+
             console.log('APEX-MD connected to WhatsApp ✅');
 
-            if (ownerNumber && ownerNumber.length > 0 && ownerNumber[0]) {
+            if (ownerNumber && ownerNumber.length > 0) {
                 let up = `APEX-MD connected successful ✅\n\nPREFIX: ${prefix}`;
                 conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-                    image: { url: botSettings.ALIVE_IMG || `https://imgur.com/a/JVLUBdD` }, 
+                    image: { url: botSettings.ALIVE_IMG || `https://imgur.com/a/JVLUBdD` },
                     caption: up
-                }).catch(e => console.error("Error sending welcome message to owner:", e));
+                }).catch(e => console.error("Error sending welcome:", e));
             }
         }
     });
 
-    // ⚠️ අතිශය වැදගත්: Session එක Save වෙන්න මේ පේළිය අනිවාර්යයි
+    // 5. Creds Save කිරීම (මේක නැතුව තමයි එක පාරයි රිප්ලයි කළේ)
     conn.ev.on('creds.update', saveCreds);
 
+    // 6. Messages Upsert (මැසේජ් එන තැන)
     conn.ev.on('messages.upsert', async (mekEvent) => {
         const mek = mekEvent.messages[0];
         if (!mek.message || mek.key.remoteJid === 'status@broadcast') return;
@@ -116,42 +126,40 @@ async function connectToWA() {
         const m = sms(conn, mek);
         if (!m || !m.type) return;
 
-        // සෑම මැසේජ් එකකදීම Settings අලුත් කරගැනීම
-        botSettings = getBotSettings(); 
-        prefix = botSettings.PREFIX || "."; 
+        // Settings Update on every message
+        botSettings = getBotSettings();
+        prefix = botSettings.PREFIX || ".";
 
-        const body = m.body || ''; 
-        
+        const body = m.body || '';
         const isCmd = body && body.startsWith(prefix);
         const command = isCmd ? body.slice(prefix.length).trim().split(' ')[0].toLowerCase() : '';
         const args = body.trim().split(/ +/).slice(1);
         const q = args.join(' ');
-        
-        const from = m.chat; 
-        const quoted = m.quoted; 
-        const isGroup = m.isGroup; 
-        const sender = m.sender; 
+        const from = m.chat;
+        const quoted = m.quoted;
+        const isGroup = m.isGroup;
+        const sender = m.sender;
 
         if (!sender) return;
         if (!conn.user || !conn.user.id) return;
 
         const senderNumber = sender.split('@')[0];
         const botNumber = conn.user.id.split(':')[0];
-        const pushname = mek.pushName || 'no name'; 
-        const isMe = senderNumber === botNumber; 
+        const pushname = mek.pushName || 'no name';
+        const isMe = senderNumber === botNumber;
         const isOwner = ownerNumber.includes(senderNumber) || isMe;
         const botNumber2 = await jidNormalizedUser(conn.user.id);
-        
+
         const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(e => { return null; }) : null;
         const groupName = groupMetadata ? groupMetadata.subject : '';
         const participants = groupMetadata ? groupMetadata.participants : [];
         const groupAdmins = isGroup && participants.length > 0 ? getGroupAdmins(participants) : [];
         const isBotAdmins = isGroup && groupAdmins.length > 0 ? groupAdmins.includes(botNumber2) : false;
         const isAdmins = isGroup && groupAdmins.length > 0 ? groupAdmins.includes(sender) : false;
-        
-        const reply = (teks, chatId = from, options = {}) => m.reply(teks, chatId, options); 
 
-        // File Sending Function
+        const reply = (teks, chatId = from, options = {}) => m.reply(teks, chatId, options);
+
+        // File Send Function
         conn.sendFileUrl = async (jid, url, caption, quotedMsg, options = {}) => {
             let mime = '';
             try {
@@ -159,7 +167,7 @@ async function connectToWA() {
                 mime = headRes.headers['content-type'];
                 if (!mime) throw new Error("Could not determine MIME type");
 
-                const buffer = await getBuffer(url); 
+                const buffer = await getBuffer(url);
                 if (!buffer) throw new Error("Failed to download file buffer");
 
                 const fileNameFromUrl = path.basename(new URL(url).pathname);
@@ -183,15 +191,17 @@ async function connectToWA() {
 
             } catch (error) {
                 console.error("Error in sendFileUrl:", error);
-                reply(`Error sending file: ${error.message}`, from); 
+                reply(`Error sending file: ${error.message}`, from);
             }
         };
 
+        // Work Mode Logic
         const currentWorkMode = botSettings.MODE ? botSettings.MODE.toLowerCase() : 'public';
         if (currentWorkMode === 'private' && !isOwner) return;
         if (currentWorkMode === 'inbox' && !isOwner && isGroup) return;
         if (currentWorkMode === 'groups' && !isGroup && !isOwner) return;
 
+        // Command Handling
         const events = require('./command');
         const cmdName = command;
 
@@ -228,61 +238,49 @@ async function connectToWA() {
     });
 }
 
+// --- බොට් ආරම්භ කිරීම ---
 async function startBot() {
-    // Session File Handling
     const authPath = path.join(__dirname, 'auth_info_baileys', 'creds.json');
     const authDir = path.join(__dirname, 'auth_info_baileys');
 
+    // Folder එක නැත්නම් හදනවා
     if (!fs.existsSync(authDir)) {
-        try {
-            fs.mkdirSync(authDir, { recursive: true });
-        } catch (e) {
-            console.error("Failed to create auth directory:", e);
-            process.exit(1);
-        }
+        fs.mkdirSync(authDir, { recursive: true });
     }
 
     if (fs.existsSync(authPath)) {
         console.log("Session file found. Connecting to WhatsApp...");
-        connectToWA().catch(err => {
-            console.error("Failed to connect to WhatsApp with existing session:", err);
-        });
+        connectToWA().catch(err => console.error("Connection Error:", err));
     } else if (appConfig.SESSION_ID) {
-        console.log("Session file not found, attempting to download using SESSION_ID...");
+        console.log("Downloading session from SESSION_ID...");
         const sessdata = appConfig.SESSION_ID.trim();
-        // Check for valid format
         const sessionUrl = `https://mega.nz/file/${sessdata}`;
-        console.log(`Downloading session from: ${sessionUrl}`);
+        
         try {
             const filer = File.fromURL(sessionUrl);
             filer.download((err, data) => {
                 if (err) {
-                    console.error("Error downloading session:", err);
-                    connectToWA().catch(qrErr => console.error("Failed to connect for QR scan:", qrErr));
+                    console.error("Session download failed. Starting QR Scan.");
+                    connectToWA();
                     return;
                 }
-                fs.writeFile(authPath, data, (writeErr) => {
-                    if (writeErr) {
-                        console.error("Error writing session file:", writeErr);
-                        connectToWA().catch(qrErr => console.error("Failed to connect for QR scan:", qrErr));
-                        return;
-                    }
-                    console.log("Session downloaded and written successfully ✅");
-                    connectToWA().catch(connErr => console.error("Failed to connect:", connErr));
+                fs.writeFile(authPath, data, () => {
+                    console.log("Session downloaded ✅");
+                    connectToWA();
                 });
             });
         } catch (e) {
             console.error("MegaJS Error:", e);
-            connectToWA().catch(err => console.error("Failed to connect for QR scan:", err));
+            connectToWA();
         }
     } else {
-        console.log("No Session ID. Connecting for QR Scan...");
-        connectToWA().catch(err => console.error("Failed to connect:", err));
+        console.log("No Session ID. Starting QR Scan...");
+        connectToWA();
     }
 }
 
 app.get("/", (req, res) => {
-    res.send("Hey, bot is starting or running ✅");
+    res.send("APEX-MD Bot is Running ✅");
 });
 
 app.listen(port, () => {
