@@ -8,8 +8,8 @@ if (fs.existsSync('config.env')) {
 
 module.exports = {
   //===================Bot info===============================
-    SESSION_ID: process.env.SESSION_ID || "TjRwDbpB#iMFtLDCvJbD0GnRTTBr3Yi-nDMax5U6y0KDWl3L21nM",
-    MONGODB: process.env.MONGODB || "mongodb+srv://pancha:2006.Shehan@cluster0.hyugfei.mongodb.net/",
+    SESSION_ID: process.env.SESSION_ID || "KmgUwCLC#w1vyaSarvRmMVXDXKSdhDSD2dvF0qx1UFgDnvmPB30U",
+    MONGODB: process.env.MONGODB || "mongodb+srv://realpancha:2006.Shehan@cluster0.pkchtlr.mongodb.net/",
     GEMINI_API_KEY: process.env.GEMINI_API_KEY || "AIzaSyCItRq9qKhyDo5ZjO_ZBtRC1Z-Y3UD9Ma0",
     
 // ==================Your info=================================
@@ -22,3 +22,6 @@ module.exports = {
   
 
 };
+
+
+//mongodb+srv://pancha:2006.Shehan@cluster0.hyugfei.mongodb.net/
