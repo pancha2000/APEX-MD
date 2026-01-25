@@ -43,11 +43,20 @@ async function connectToWA() {
     const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/');
     const { version } = await fetchLatestBaileysVersion();
 
+    // 1. Log Filter එක: අනවශ්‍ය Error හංගන කොටස
+    const logFilter = {
+        write: (msg) => {
+            if (msg.includes('Bad MAC') || msg.includes('No session') || msg.includes('decrypt') || msg.includes('Stream Errored')) return;
+            process.stdout.write(msg);
+        }
+    };
+
     const conn = makeWASocket({
-        logger: P({ level: 'silent' }), // ලොග් එක පිරෙන එක නවත්තන්න silent කළා
+        // මෙතන 'silent' අයින් කරලා 'error' දැම්මා, හැබැයි filter එකත් දැම්මා
+        logger: P({ level: 'error' }, logFilter), 
         printQRInTerminal: true,
         browser: Browsers.ubuntu("Chrome"),
-        syncFullHistory: false, // ඉතිහාසය ලෝඩ් කිරීම නැවැත්තුවා
+        syncFullHistory: false, 
         auth: state,
         version: version, 
         generateHighQualityLinkPreview: true,
@@ -108,7 +117,6 @@ async function connectToWA() {
         const mek = mekEvent.messages[0];
         if (!mek.message || mek.key.remoteJid === 'status@broadcast') return;
         
-        // ⚠️ @lid මැසේජ් වලින් එන Error නවත්වන්න මේ කොටස දැම්මා
         if (mek.key.remoteJid.includes('@lid')) return;
 
         const m = sms(conn, mek);
@@ -191,9 +199,32 @@ async function connectToWA() {
             if (cmdObj) {
                 if (cmdObj.react) conn.sendMessage(from, { react: { text: cmdObj.react, key: mek.key } });
                 try {
-                    cmdObj.function(conn, mek, m, { from, quoted, body, isCmd, command: cmdName, cmdObject: cmdObj, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply });
+                    // Command එක Run කරනවා
+                    await cmdObj.function(conn, mek, m, { from, quoted, body, isCmd, command: cmdName, cmdObject: cmdObj, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply });
                 } catch (e) {
-                    console.error(`[PLUGIN ERROR][${cmdName}]`, e);
+                    // 2. Error System එක: ලෙඩේ කෙලින්ම Owner ට කියන කොටස
+                    console.error(`[PLUGIN ERROR] ${cmdName}:`, e);
+                    
+                    // User ට පොඩි මැසේජ් එකක්
+                    reply("❌ අම්මටසිරි පොඩි අවුලක් ගියා. මම මේක Owner ට දැන්ම කිව්වා.");
+
+                    // Owner ට සම්පූර්ණ Report එකක්
+                    const errorReport = `
+🚨 *APEX-MD ERROR REPORT* 🚨
+
+🤖 *Command:* ${cmdName}
+👤 *User:* ${pushname} (${senderNumber})
+💬 *Chat:* ${isGroup ? groupName : 'Private Chat'}
+📄 *Error:* \`\`\`${e.message}\`\`\`
+stacks: \`\`\`${e.stack}\`\`\`
+`;
+                    // Owner ගේ නම්බර් එකට යවනවා
+                    await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { 
+                        text: errorReport,
+                        contextInfo: {
+                            mentionedJid: [sender]
+                        }
+                    });
                 }
             }
         } else if (body) {
@@ -275,3 +306,4 @@ process.on('uncaughtException', function (err) {
 process.on('unhandledRejection', (reason, promise) => {
     console.log('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
