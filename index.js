@@ -1,33 +1,19 @@
 // ================================================================
-// 🛑 ERROR HIDER & LOG CLEANER (වද දෙන Error හංගන කොටස)
+// 🛑 ERROR HIDER (වද දෙන Error හංගන කොටස - මේක උඩින්ම තියෙන්න ඕනේ)
 // ================================================================
 const originalConsoleError = console.error;
 const originalConsoleLog = console.log;
 
-// මේ වචන තියෙන මැසේජ් Console එකේ පෙන්නන්නේ නෑ
-const hideList = [
-    'Bad MAC', 
-    'No session', 
-    'decrypt', 
-    'Closing session', 
-    'Stream Errored', 
-    'stream errored', 
-    'conflict', 
-    'Timed Out', 
-    'Connection Closed',
-    'Connection lost',
-    'Reconnecting'
-];
-
 console.error = function (msg, ...args) {
     const str = String(msg || '');
-    if (hideList.some(term => str.includes(term))) return;
+    // මේ වචන තියෙන Error එළියට පෙන්නන්න එපා
+    if (str.includes('Bad MAC') || str.includes('Session error') || str.includes('Decrypt') || str.includes('Closing session') || str.includes('Stream Errored')) return;
     originalConsoleError.apply(console, [msg, ...args]);
 };
 
 console.log = function (msg, ...args) {
     const str = String(msg || '');
-    if (hideList.some(term => str.includes(term))) return;
+    if (str.includes('Bad MAC') || str.includes('Session error') || str.includes('Decrypt') || str.includes('Closing session') || str.includes('Stream Errored')) return;
     originalConsoleLog.apply(console, [msg, ...args]);
 };
 // ================================================================
@@ -69,10 +55,7 @@ async function connectToWA() {
         prefix = botSettings.PREFIX || ".";
         console.log("Bot settings loaded. Prefix:", prefix, "Mode:", botSettings.MODE);
     } catch (error) {
-        // Warning එකක් විදිහට පෙන්නන්න, ඒත් Error Filter එකට අහුවෙනවා නම් පෙන්නන්නේ නෑ
-        if (!error.message.includes('Timed Out')) {
-            console.warn("Could not load settings from DB.", error.message);
-        }
+        console.warn("Could not load settings from DB.", error.message);
     }
 
     console.log("Connecting APEX-MD Wa-BOT 🧬...");
@@ -80,18 +63,22 @@ async function connectToWA() {
     const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/');
     const { version } = await fetchLatestBaileysVersion();
 
+    // Pino Logger Filter එක (මේකත් තියෙන්න දින්න)
+    const logFilter = {
+        write: (msg) => {
+            if (msg.includes('Bad MAC') || msg.includes('No session') || msg.includes('decrypt') || msg.includes('Stream Errored')) return;
+            process.stdout.write(msg);
+        }
+    };
+
     const conn = makeWASocket({
-        // 🤫 SILENT MODE: මේකෙන් අර දිග JSON logs ඔක්කොම නවතිනවා
-        logger: P({ level: 'silent' }), 
+        logger: P({ level: 'error' }, logFilter),
         printQRInTerminal: true,
         browser: Browsers.ubuntu("Chrome"),
         syncFullHistory: false, 
         auth: state,
-        version: version,
+        version: version, 
         generateHighQualityLinkPreview: true,
-        connectTimeoutMs: 60000, 
-        keepAliveIntervalMs: 10000, 
-        retryRequestDelayMs: 2000 
     });
 
     conn.ev.on('connection.update', (update) => {
@@ -109,11 +96,7 @@ async function connectToWA() {
                                      statusCode !== DisconnectReason.connectionLost &&
                                      statusCode !== DisconnectReason.timedOut);
 
-            // Log එක filter කරලා යවනවා
-            const errStr = String(lastDisconnect.error || '');
-            if (!hideList.some(term => errStr.includes(term))) {
-                console.log('Connection closed, reconnecting:', shouldReconnect);
-            }
+            console.log('Connection closed due to ', lastDisconnect.error, ', reconnecting ', shouldReconnect);
 
             if (statusCode === DisconnectReason.loggedOut) {
                 console.log('Logged out. Please delete Session and restart.');
@@ -142,9 +125,7 @@ async function connectToWA() {
                 conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
                     image: { url: botSettings.ALIVE_IMG },
                     caption: up
-                }).catch(e => {
-                    // Welcome Msg එකේ එන පොඩි පොඩි Error ගණන් ගන්නේ නෑ
-                });
+                }).catch(e => console.error("Error sending welcome:", e));
             }
         }
     });
@@ -155,8 +136,8 @@ async function connectToWA() {
         const mek = mekEvent.messages[0];
         if (!mek.message || mek.key.remoteJid === 'status@broadcast') return;
         
-        // ⚠️ @lid මැසේජ් සහ Poll Updates බ්ලොක් කිරීම
-        if (mek.key.remoteJid.includes('@lid') || mek.message.protocolMessage) return;
+        // ⚠️ @lid මැසේජ් වලින් එන Error නවත්වන්න මේ කොටස දැම්මා
+        if (mek.key.remoteJid.includes('@lid')) return;
 
         const m = sms(conn, mek);
         if (!m || !m.type) return;
@@ -238,11 +219,16 @@ async function connectToWA() {
             if (cmdObj) {
                 if (cmdObj.react) conn.sendMessage(from, { react: { text: cmdObj.react, key: mek.key } });
                 try {
+                    // Command එක Run කරනවා
                     await cmdObj.function(conn, mek, m, { from, quoted, body, isCmd, command: cmdName, cmdObject: cmdObj, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply });
                 } catch (e) {
+                    // 2. Error System එක: ලෙඩේ කෙලින්ම Owner ට කියන කොටස
                     console.error(`[PLUGIN ERROR] ${cmdName}:`, e);
+                    
+                    // User ට පොඩි මැසේජ් එකක්
                     reply("❌ අම්මටසිරි පොඩි අවුලක් ගියා. මම මේක Owner ට දැන්ම කිව්වා.");
 
+                    // Owner ට සම්පූර්ණ Report එකක්
                     const errorReport = `
 🚨 *APEX-MD ERROR REPORT* 🚨
 
@@ -252,6 +238,7 @@ async function connectToWA() {
 📄 *Error:* \`\`\`${e.message}\`\`\`
 stacks: \`\`\`${e.stack}\`\`\`
 `;
+                    // Owner ගේ නම්බර් එකට යවනවා
                     await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { 
                         text: errorReport,
                         contextInfo: {
@@ -275,7 +262,7 @@ stacks: \`\`\`${e.stack}\`\`\`
                             cmdObject.function(conn, mek, m, commonParams);
                         }
                     } catch (e) {
-                         // Plugin වලින් එන පොඩි පොඩි එරර් එළියට නොදා ඉමු
+                         console.error(`[EVENT PLUGIN ERROR][on:${cmdObject.on}]`, e);
                     }
                 }
             });
@@ -293,9 +280,7 @@ async function startBot() {
 
     if (fs.existsSync(authPath)) {
         console.log("Session file found. Connecting...");
-        connectToWA().catch(err => { 
-            // මෙතන Error එක Print නොකර ඉමු, මොකද උඩ Filter එකෙන් කොහොමත් අල්ලනවා
-        });
+        connectToWA().catch(err => console.error("Connection Error:", err));
     } else if (appConfig.SESSION_ID) {
         console.log("Downloading session from SESSION_ID...");
         const sessdata = appConfig.SESSION_ID.trim();
@@ -333,18 +318,11 @@ app.listen(port, () => {
     startBot();
 });
 
+// --- ANTI-CRASH HANDLERS ---
 process.on('uncaughtException', function (err) {
-    // මේකෙන් අර අන්තිමටම එන ලොකු Error ටික console එකට යවන එක නවත්තනවා (filter එක හරහා යන නිසා)
-    const errStr = String(err);
-    if (!hideList.some(term => errStr.includes(term))) {
-        console.log('Caught exception: ', err);
-    }
+    console.log('Caught exception: ', err);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-    const errStr = String(reason);
-    if (!hideList.some(term => errStr.includes(term))) {
-        console.log('Unhandled Rejection at:', promise, 'reason:', reason);
-    }
+    console.log('Unhandled Rejection at:', promise, 'reason:', reason);
 });
-
