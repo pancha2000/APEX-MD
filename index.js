@@ -18,7 +18,7 @@ const { File } = require('megajs');
 const path = require('path');
 const { getBotSettings, readEnv, connectDB } = require('./lib/mongodb');
 
-const ownerNumber = ['94701391585']; // ඔයාගේ නම්බර් එක
+const ownerNumber = ['94701391585']; 
 const express = require("express");
 const app = express();
 const port = process.env.PORT || 8000;
@@ -44,10 +44,12 @@ async function connectToWA() {
     const { version } = await fetchLatestBaileysVersion();
 
     const conn = makeWASocket({
-        logger: P({ level: 'silent' }),
+        // 1. Logger එක 'info' කළා. දැන් එරර් ආවොත් පෙනෙයි.
+        logger: P({ level: 'info' }), 
         printQRInTerminal: true,
-        browser: Browsers.ubuntu("Chrome"), // 405 Error වලක්වයි
-        syncFullHistory: true,
+        browser: Browsers.ubuntu("Chrome"),
+        // 2. මෙන්න මේක false කළාම 'Reply Once' ලෙඩේ ෂුවර් එකටම හරියනවා
+        syncFullHistory: false, 
         auth: state,
         version: version, 
         generateHighQualityLinkPreview: true,
