@@ -1,3 +1,23 @@
+// ================================================================
+// 🛑 ERROR HIDER (වද දෙන Error හංගන කොටස - මේක උඩින්ම තියෙන්න ඕනේ)
+// ================================================================
+const originalConsoleError = console.error;
+const originalConsoleLog = console.log;
+
+console.error = function (msg, ...args) {
+    const str = String(msg || '');
+    // මේ වචන තියෙන Error එළියට පෙන්නන්න එපා
+    if (str.includes('Bad MAC') || str.includes('Session error') || str.includes('Decrypt') || str.includes('Closing session') || str.includes('Stream Errored')) return;
+    originalConsoleError.apply(console, [msg, ...args]);
+};
+
+console.log = function (msg, ...args) {
+    const str = String(msg || '');
+    if (str.includes('Bad MAC') || str.includes('Session error') || str.includes('Decrypt') || str.includes('Closing session') || str.includes('Stream Errored')) return;
+    originalConsoleLog.apply(console, [msg, ...args]);
+};
+// ================================================================
+
 const {
     default: makeWASocket,
     useMultiFileAuthState,
@@ -43,7 +63,7 @@ async function connectToWA() {
     const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/');
     const { version } = await fetchLatestBaileysVersion();
 
-    // 1. Log Filter එක: අනවශ්‍ය Error හංගන කොටස
+    // Pino Logger Filter එක (මේකත් තියෙන්න දින්න)
     const logFilter = {
         write: (msg) => {
             if (msg.includes('Bad MAC') || msg.includes('No session') || msg.includes('decrypt') || msg.includes('Stream Errored')) return;
@@ -52,8 +72,7 @@ async function connectToWA() {
     };
 
     const conn = makeWASocket({
-        // මෙතන 'silent' අයින් කරලා 'error' දැම්මා, හැබැයි filter එකත් දැම්මා
-        logger: P({ level: 'error' }, logFilter), 
+        logger: P({ level: 'error' }, logFilter),
         printQRInTerminal: true,
         browser: Browsers.ubuntu("Chrome"),
         syncFullHistory: false, 
@@ -117,6 +136,7 @@ async function connectToWA() {
         const mek = mekEvent.messages[0];
         if (!mek.message || mek.key.remoteJid === 'status@broadcast') return;
         
+        // ⚠️ @lid මැසේජ් වලින් එන Error නවත්වන්න මේ කොටස දැම්මා
         if (mek.key.remoteJid.includes('@lid')) return;
 
         const m = sms(conn, mek);
@@ -306,4 +326,3 @@ process.on('uncaughtException', function (err) {
 process.on('unhandledRejection', (reason, promise) => {
     console.log('Unhandled Rejection at:', promise, 'reason:', reason);
 });
-
