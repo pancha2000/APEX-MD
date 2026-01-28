@@ -4,13 +4,14 @@ const {
     DisconnectReason,
     jidNormalizedUser,
     fetchLatestBaileysVersion,
-    Browsers
+    Browsers,
+    makeCacheableSignalKeyStore // යතුරු ආරක්ෂා කිරීමට එක් කරන ලදී
 } = require('@whiskeysockets/baileys');
 
 const { getBuffer, getGroupAdmins, getRandom, h2k, isUrl, Json, runtime, sleep, fetchJson } = require('./lib/functions');
 const fs = require('fs');
 const P = require('pino');
-const appConfig = require('./config');
+const config = require('./config');
 const qrcode = require('qrcode-terminal');
 const { sms } = require('./lib/msg');
 const axios = require('axios');
@@ -23,87 +24,77 @@ const express = require("express");
 const app = express();
 const port = process.env.PORT || 8000;
 
-let botSettings = getBotSettings();
-let prefix = botSettings.PREFIX;
-
 async function connectToWA() {
     await connectDB();
-
     try {
         await readEnv();
-        botSettings = getBotSettings();
-        prefix = botSettings.PREFIX || ".";
-        console.log("Bot settings loaded. Prefix:", prefix, "Mode:", botSettings.MODE);
-    } catch (error) {
-        console.log("Settings Load Error:", error.message);
+    } catch (e) {
+        console.log("Error reading env:", e);
     }
 
+    let botSettings = getBotSettings();
+    let prefix = botSettings.PREFIX || ".";
+    
     console.log("Connecting APEX-MD Wa-BOT 🧬...");
 
-    const { state, saveCreds } = await useMultiFileAuthState(__dirname + '/auth_info_baileys/');
+    const authPath = path.join(__dirname, 'auth_info_baileys');
+    const { state, saveCreds } = await useMultiFileAuthState(authPath);
     const { version } = await fetchLatestBaileysVersion();
 
     const conn = makeWASocket({
-        // මෙතන 'silent' දාමු, එතකොට අර ලොකු JSON කෑලි එන්නේ නෑ. හැබැයි අනිත් ඒවා පේනවා.
-        logger: P({ level: 'silent' }), 
+        logger: P({ level: 'silent' }),
         printQRInTerminal: true,
         browser: Browsers.ubuntu("Chrome"),
-        syncFullHistory: false, // ඉතිහාසය ලෝඩ් නොකරන නිසා බොට් වේගවත්
-        auth: state,
+        // Bad MAC Error එක වළක්වන ප්‍රධානම කොටස
+        auth: {
+            creds: state.creds,
+            keys: makeCacheableSignalKeyStore(state.keys, P({ level: "silent" })),
+        },
         version: version,
         generateHighQualityLinkPreview: true,
-        connectTimeoutMs: 60000, 
-        keepAliveIntervalMs: 10000, 
-        retryRequestDelayMs: 2000 
+        syncFullHistory: false,
     });
 
-    conn.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
+    conn.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect } = update;
         
-        if (qr && !conn.authState.creds.registered) {
-            console.log('Scan QR code to connect:');
-            qrcode.generate(qr, { small: true });
-        }
-
         if (connection === 'close') {
-            const statusCode = lastDisconnect.error?.output?.statusCode;
-            const shouldReconnect = (statusCode !== DisconnectReason.loggedOut &&
-                                     statusCode !== DisconnectReason.connectionClosed &&
-                                     statusCode !== DisconnectReason.connectionLost &&
-                                     statusCode !== DisconnectReason.timedOut);
+            let reason = lastDisconnect.error?.output?.statusCode;
+            console.log('Connection closed. Reason Code:', reason);
 
-            // Log එකේ පෙන්නමු ඇයි කැඩුනේ කියලා (හංගන්නේ නෑ)
-            console.log('Connection closed:', lastDisconnect.error?.message || statusCode);
-
-            if (statusCode === DisconnectReason.loggedOut) {
-                console.log('Logged out. Please delete Session and restart.');
-            } else if (shouldReconnect) {
-                console.log('Reconnecting...');
+            if (reason === DisconnectReason.restartRequired || reason === DisconnectReason.connectionLost || reason === DisconnectReason.timedOut) {
+                console.log('Reconnecting immediately...');
+                connectToWA();
+            } else if (reason === DisconnectReason.loggedOut) {
+                console.log('Logged out. Please delete session and scan again.');
+            } else {
+                console.log('Connection closed, trying to reconnect...');
                 connectToWA();
             }
         } else if (connection === 'open') {
-            console.log('⬇️ Installing APEX-MD Plugins... ');
-            const pluginDir = "./plugins/";
+            console.log('APEX-MD connected to WhatsApp ✅');
+            
+            console.log('⬇️ Installing APEX-MD Plugins...');
+            const pluginDir = path.join(__dirname, 'plugins');
             if (fs.existsSync(pluginDir)) {
-                fs.readdirSync(pluginDir).forEach((pluginFile) => {
-                    if (path.extname(pluginFile).toLowerCase() === ".js") {
+                fs.readdirSync(pluginDir).forEach(file => {
+                    if (file.endsWith('.js')) {
                         try {
-                            require(path.join(__dirname, pluginDir, pluginFile));
+                            require(path.join(pluginDir, file));
                         } catch (e) {
-                            console.error(`Error loading plugin ${pluginFile}:`, e);
+                            console.error(`Error loading plugin ${file}:`, e);
                         }
                     }
                 });
                 console.log('APEX-MD Plugins installed successful ✅');
             }
-            console.log('APEX-MD connected to WhatsApp ✅');
 
             if (ownerNumber.length > 0) {
-                let up = `APEX-MD connected successful ✅\n\nPREFIX: ${prefix}`;
-                conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-                    image: { url: botSettings.ALIVE_IMG },
-                    caption: up
-                }).catch(e => {});
+                let up = `*APEX-MD connected successful ✅*\n\n*PREFIX:* ${prefix}\n*MODE:* ${botSettings.MODE || 'public'}`;
+                await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { 
+                    image: { url: botSettings.ALIVE_IMG || "https://telegra.ph/file/2a1389884489b4f494677.jpg" },
+                    caption: up 
+                });
             }
         }
     });
@@ -113,8 +104,6 @@ async function connectToWA() {
     conn.ev.on('messages.upsert', async (mekEvent) => {
         const mek = mekEvent.messages[0];
         if (!mek.message || mek.key.remoteJid === 'status@broadcast') return;
-        
-        // System messages අයින් කරමු
         if (mek.key.remoteJid.includes('@lid') || mek.message.protocolMessage) return;
 
         const m = sms(conn, mek);
@@ -124,49 +113,42 @@ async function connectToWA() {
         prefix = botSettings.PREFIX || ".";
 
         const body = m.body || '';
-        const isCmd = body && body.startsWith(prefix);
+        const isCmd = body.startsWith(prefix);
         const command = isCmd ? body.slice(prefix.length).trim().split(' ')[0].toLowerCase() : '';
         const args = body.trim().split(/ +/).slice(1);
         const q = args.join(' ');
         const from = m.chat;
-        const quoted = m.quoted;
-        const isGroup = m.isGroup;
         const sender = m.sender;
-
-        if (!sender) return;
-        if (!conn.user || !conn.user.id) return;
-
+        const pushname = m.pushName || 'User';
         const senderNumber = sender.split('@')[0];
         const botNumber = conn.user.id.split(':')[0];
-        const pushname = mek.pushName || 'no name';
         const isMe = senderNumber === botNumber;
         const isOwner = ownerNumber.includes(senderNumber) || isMe;
         const botNumber2 = await jidNormalizedUser(conn.user.id);
 
-        const groupMetadata = isGroup ? await conn.groupMetadata(from).catch(e => { return null; }) : null;
+        const groupMetadata = m.isGroup ? await conn.groupMetadata(from).catch(() => null) : null;
         const groupName = groupMetadata ? groupMetadata.subject : '';
         const participants = groupMetadata ? groupMetadata.participants : [];
-        const groupAdmins = isGroup && participants.length > 0 ? getGroupAdmins(participants) : [];
-        const isBotAdmins = isGroup && groupAdmins.length > 0 ? groupAdmins.includes(botNumber2) : false;
-        const isAdmins = isGroup && groupAdmins.length > 0 ? groupAdmins.includes(sender) : false;
+        const groupAdmins = m.isGroup ? getGroupAdmins(participants) : [];
+        const isBotAdmins = m.isGroup ? groupAdmins.includes(botNumber2) : false;
+        const isAdmins = m.isGroup ? groupAdmins.includes(sender) : false;
 
-        const reply = (teks, chatId = from, options = {}) => m.reply(teks, chatId, options);
+        const reply = (teks) => conn.sendMessage(from, { text: teks }, { quoted: mek });
 
+        // මුල් කෝඩ් එකේ තිබුණු sendFileUrl Function එක
         conn.sendFileUrl = async (jid, url, caption, quotedMsg, options = {}) => {
             let mime = '';
             try {
                 const headRes = await axios.head(url, { timeout: 5000 });
                 mime = headRes.headers['content-type'];
-                if (!mime) throw new Error("Could not determine MIME type");
                 const buffer = await getBuffer(url);
-                if (!buffer) throw new Error("Failed to download file buffer");
                 const fileNameFromUrl = path.basename(new URL(url).pathname);
 
                 if (mime.split("/")[0] === "image" && mime.split("/")[1] === "gif") {
                     return conn.sendMessage(jid, { video: buffer, caption: caption, gifPlayback: true, ...options }, { quoted: quotedMsg });
                 }
                 if (mime === "application/pdf") {
-                    return conn.sendMessage(jid, { document: buffer, mimetype: 'application/pdf', fileName: caption || fileNameFromUrl || "document.pdf", caption: caption, ...options }, { quoted: quotedMsg });
+                    return conn.sendMessage(jid, { document: buffer, mimetype: 'application/pdf', fileName: caption || "document.pdf", caption: caption, ...options }, { quoted: quotedMsg });
                 }
                 if (mime.startsWith("image/")) {
                     return conn.sendMessage(jid, { image: buffer, caption: caption, ...options }, { quoted: quotedMsg });
@@ -177,54 +159,38 @@ async function connectToWA() {
                 if (mime.startsWith("audio/")) {
                     return conn.sendMessage(jid, { audio: buffer, mimetype: mime, ...options }, { quoted: quotedMsg });
                 }
-                return conn.sendMessage(jid, { document: buffer, mimetype: mime, caption: caption, fileName: fileNameFromUrl || "file" + path.extname(url), ...options }, { quoted: quotedMsg });
+                return conn.sendMessage(jid, { document: buffer, mimetype: mime, caption: caption, fileName: fileNameFromUrl, ...options }, { quoted: quotedMsg });
             } catch (error) {
                 console.error("Error in sendFileUrl:", error);
-                reply(`Error sending file: ${error.message}`, from);
             }
         };
 
-        const currentWorkMode = botSettings.MODE ? botSettings.MODE.toLowerCase() : 'public';
+        const currentWorkMode = (botSettings.MODE || 'public').toLowerCase();
         if (currentWorkMode === 'private' && !isOwner) return;
-        if (currentWorkMode === 'inbox' && !isOwner && isGroup) return;
-        if (currentWorkMode === 'groups' && !isGroup && !isOwner) return;
+        if (currentWorkMode === 'inbox' && !isOwner && m.isGroup) return;
+        if (currentWorkMode === 'groups' && !m.isGroup && !isOwner) return;
 
         const events = require('./command');
-        const cmdName = command;
+        const cmd = events.commands.find((c) => c.pattern === command) || events.commands.find((c) => c.alias && c.alias.includes(command));
 
-        if (isCmd && cmdName) {
-            const cmdObj = events.commands.find((cmd) => cmd.pattern === cmdName) || events.commands.find((cmd) => cmd.alias && cmd.alias.includes(cmdName));
-            if (cmdObj) {
-                if (cmdObj.react) conn.sendMessage(from, { react: { text: cmdObj.react, key: mek.key } });
-                try {
-                    await cmdObj.function(conn, mek, m, { from, quoted, body, isCmd, command: cmdName, cmdObject: cmdObj, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply });
-                } catch (e) {
-                    console.error(`[PLUGIN ERROR] ${cmdName}:`, e);
-                    // මෙතන අර Owner Report කෑල්ල තියෙනවා
-                    const errorReport = `
-🚨 *APEX-MD ERROR REPORT* 🚨
-🤖 *Command:* ${cmdName}
-📄 *Error:* ${e.message}`;
-                    await conn.sendMessage(ownerNumber[0] + "@s.whatsapp.net", { text: errorReport });
-                }
+        if (cmd) {
+            if (cmd.react) conn.sendMessage(from, { react: { text: cmd.react, key: mek.key } });
+            try {
+                await cmd.function(conn, mek, m, { 
+                    from, prefix, q, args, isGroup: m.isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, 
+                    groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply 
+                });
+            } catch (e) {
+                console.error(`[PLUGIN ERROR] ${command}:`, e);
             }
         } else if (body) {
             events.commands.forEach(async (cmdObject) => {
                 if (cmdObject.on) {
-                    const commonParams = { from, quoted, body, isCmd: false, command: '', cmdObject, args, q, isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply };
+                    const commonParams = { from, prefix, q, args, isGroup: m.isGroup, sender, senderNumber, botNumber2, botNumber, pushname, isMe, isOwner, groupMetadata, groupName, participants, groupAdmins, isBotAdmins, isAdmins, reply };
                     try {
-                        if (cmdObject.on === "body") {
-                            cmdObject.function(conn, mek, m, commonParams);
-                        } else if (cmdObject.on === "text" && q) {
-                            cmdObject.function(conn, mek, m, commonParams);
-                        } else if ((cmdObject.on === "image" || cmdObject.on === "photo") && m.type === "imageMessage") {
-                            cmdObject.function(conn, mek, m, commonParams);
-                        } else if (cmdObject.on === "sticker" && m.type === "stickerMessage") {
-                            cmdObject.function(conn, mek, m, commonParams);
-                        }
-                    } catch (e) {
-                         // Silent fail for event errors
-                    }
+                        if (cmdObject.on === "body") cmdObject.function(conn, mek, m, commonParams);
+                        else if (cmdObject.on === "text" && q) cmdObject.function(conn, mek, m, commonParams);
+                    } catch (e) { /* silent error for on-body events */ }
                 }
             });
         }
@@ -232,58 +198,41 @@ async function connectToWA() {
 }
 
 async function startBot() {
-    const authPath = path.join(__dirname, 'auth_info_baileys', 'creds.json');
     const authDir = path.join(__dirname, 'auth_info_baileys');
+    const credsFile = path.join(authDir, 'creds.json');
 
-    if (!fs.existsSync(authDir)) {
-        fs.mkdirSync(authDir, { recursive: true });
-    }
+    if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true });
 
-    if (fs.existsSync(authPath)) {
-        console.log("Session file found. Connecting...");
-        connectToWA().catch(err => console.log("Connection Fail"));
-    } else if (appConfig.SESSION_ID) {
-        console.log("Downloading session from SESSION_ID...");
-        const sessdata = appConfig.SESSION_ID.trim();
-        const sessionUrl = `https://mega.nz/file/${sessdata}`;
-        
+    if (fs.existsSync(credsFile)) {
+        connectToWA();
+    } else if (config.SESSION_ID) {
+        console.log("Downloading session from MEGA...");
         try {
-            const filer = File.fromURL(sessionUrl);
-            filer.download((err, data) => {
-                if (err) {
-                    console.error("Session download failed. Starting QR Scan.");
-                    connectToWA();
-                    return;
-                }
-                fs.writeFile(authPath, data, () => {
+            const file = File.fromURL(`https://mega.nz/file/${config.SESSION_ID.trim()}`);
+            file.download((err, data) => {
+                if (!err) {
+                    fs.writeFileSync(credsFile, data);
                     console.log("Session downloaded ✅");
                     connectToWA();
-                });
+                } else {
+                    console.error("Mega download failed.");
+                    connectToWA();
+                }
             });
         } catch (e) {
-            console.error("MegaJS Error:", e);
             connectToWA();
         }
     } else {
-        console.log("No Session ID. Starting QR Scan...");
         connectToWA();
     }
 }
 
-app.get("/", (req, res) => {
-    res.send("APEX-MD Bot is Running ✅");
-});
-
+app.get("/", (req, res) => res.send("APEX-MD Bot is Running ✅"));
 app.listen(port, () => {
-    console.log(`Server listening on port http://localhost:${port}`);
+    console.log(`Server listening on port ${port}`);
     startBot();
 });
 
-// Anti-Crash (බොට් මැරෙන්න නොදී තියාගන්න කෑල්ල)
-process.on('uncaughtException', function (err) {
-    console.log('Caught exception: ', err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    console.log('Unhandled Rejection at:', promise, 'reason:', reason);
-});
+// Anti-crash කොටස (බොට් මැරෙන්න නොදී තියාගන්න)
+process.on('uncaughtException', (err) => console.log('Caught exception: ', err));
+process.on('unhandledRejection', (reason, promise) => console.log('Unhandled Rejection at:', promise, 'reason:', reason));
